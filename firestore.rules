@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each signed-in student can read and write only their own save, and nothing else.
+    match /players/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['progress', 'nick', 'cls', 'updated'])
+        && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best']);
+      allow delete: if false;
+    }
+  }
+}

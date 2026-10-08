@@ -168,7 +168,18 @@ h1,h2,h3{margin:0;font-weight:400}
 .modal{position:fixed;inset:0;z-index:50;background:rgba(5,8,28,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;overflow:auto}
 .modal .meta{color:var(--mute);font-size:14px;text-align:center}
 
-@media (max-width:520px){.trainer{flex:1 1 100%;margin-left:0;flex-wrap:nowrap;gap:8px}.lvl{min-width:0;flex:1 1 90px}.iconbtn{padding:6px 10px;min-height:38px;gap:6px}}
+.auth{max-width:560px}
+.fields{display:grid;gap:14px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font:700 13px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;color:var(--gold)}
+.field input{width:100%;min-height:48px;padding:8px 14px;border-radius:12px;border:2px solid var(--line);background:var(--bg0);color:var(--text);font:400 20px/1.2 var(--body)}
+.field input:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(243,221,122,.3)}
+.field small{color:var(--mute);font-size:13px}
+.chk{display:flex;align-items:flex-start;gap:10px;margin-top:14px;color:var(--text);font-size:15px;cursor:pointer}
+.chk input{width:20px;height:20px;margin:1px 0 0;accent-color:#f3dd7a;flex:none}
+.err{margin:14px 0 0;padding:10px 14px;border-radius:12px;background:rgba(217,83,79,.16);border:2px solid var(--bad);color:#fff}
+.btn[disabled]{opacity:.6;cursor:default}
+@media (max-width:520px){.trainer{flex:1 1 100%;margin-left:0;gap:8px}.lvl{min-width:0;flex:1 1 100%}.iconbtn{padding:6px 10px;min-height:38px;gap:6px;white-space:nowrap}}
 @media (prefers-reduced-motion:reduce){.flip-in{transition:none}.btn,.opt,.room,.deck{transition:none}}
 </style>
 
@@ -229,10 +240,28 @@ const ROOMS=[
 
 /* ---------- save ---------- */
 const KEY='elemental-arcade-v1';
+const PKEY=KEY+'-prefs';
+const PROG=['owned','miss','xp','stars','rounds','best'];
 const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,mute:false,deck:'s20'};
-try{const raw=localStorage.getItem(KEY);if(raw)Object.assign(S,JSON.parse(raw))}catch(e){}
-if(!DECKS.some(d=>d.id===S.deck))S.deck='s20';
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const readGuest=()=>{try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}return null};
+function loadGuest(){
+  Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0});
+  const g=readGuest();if(g)Object.assign(S,g);
+  if(!DECKS.some(d=>d.id===S.deck))S.deck='s20';
+}
+loadGuest();
+const progOf=()=>{const o={};PROG.forEach(k=>o[k]=S[k]);return o};
+const applyProg=p=>{p=p||{};PROG.forEach(k=>{S[k]=p[k]!=null?p[k]:(typeof S[k]==='number'?0:{})})};
+const guestCount=()=>{const g=readGuest();return g&&g.owned?Object.keys(g.owned).length:0};
+let ACCT=null;          // {nick, cls} while signed in
+let SYNC='';            // '', 'saving', 'saved', 'offline'
+function save(){
+  try{
+    if(ACCT)localStorage.setItem(PKEY,JSON.stringify({mute:S.mute,deck:S.deck}));
+    else localStorage.setItem(KEY,JSON.stringify(S));
+  }catch(e){}
+  if(ACCT&&window.Cloud)Cloud.save(progOf());
+}
 
 /* ---------- helpers ---------- */
 const rnd=n=>Math.floor(Math.random()*n);
@@ -459,7 +488,7 @@ function makeQ(it,room){
 }
 
 /* ---------- state ---------- */
-const V={screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
+const V={authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
 const roomPool=(room,deckId)=>deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t)));
@@ -517,6 +546,7 @@ function topHTML(){
   const L=levelInfo(S.xp);const have=ownedCount(ALL);
   return '<header class="top"><button class="logo" data-act="home" aria-label="Back to home">'+atomLogo+'<span><b>ELEMENTAL</b><small>ARCADE</small></span></button>'+
   '<div class="trainer"><div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+Math.round(L.into/L.need*100)+'%"></i></div></div>'+
+  (window.Cloud?'<button class="iconbtn" data-act="account">'+(ACCT?esc(ACCT.nick)+' <b>'+esc(ACCT.cls.toUpperCase())+'</b>':'Sign in')+'</button>':'')+
   '<button class="iconbtn" data-act="binder" aria-label="Open card binder">Binder <b>'+have+'/'+ALL.length+'</b></button>'+
   '<button class="iconbtn" data-act="mute" aria-pressed="'+!!S.mute+'">Sound <b>'+(S.mute?'Off':'On')+'</b></button></div></header>';
 }
@@ -584,8 +614,29 @@ function modalHTML(){
   const n=S.owned[it.id]||0;
   return '<div class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-label="'+esc(it.name)+' card"><div data-stop="1">'+cardHTML(it,s)+'</div><div class="meta">'+(n?'Answered correctly '+n+' time'+(n>1?'s':''):'Not collected yet')+'</div><button class="btn small" data-act="closemodal">Close</button></div>';
 }
+const SYNCTXT={saving:'Saving…',saved:'Saved to your account',offline:'Could not reach the server. Your progress will save when you are back online.'};
+function accountHTML(){
+  if(ACCT){
+    return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Signed in as '+esc(ACCT.nick)+'</h1>'+
+    '<p class="sub">Class code <b style="color:var(--gold)">'+esc(ACCT.cls.toUpperCase())+'</b>. Your binder, level and stars are saved to your account, so they follow you to any device.</p>'+
+    '<p class="sub" id="syncmsg" role="status" style="margin-top:10px">'+(SYNCTXT[SYNC]||'')+'</p>'+
+    '<div class="actions" style="margin-top:18px"><button class="btn" data-act="home">Keep playing</button><button class="btn ghost" data-act="signout">Sign out</button></div></section>';
+  }
+  const f=V.form,up=V.authTab==='up';
+  const bring=up&&guestCount()>0?'<label class="chk"><input type="checkbox" id="f-bring" '+(f.bring?'checked':'')+'> Add the '+guestCount()+' card'+(guestCount()>1?'s':'')+' already on this device to my account</label>':'';
+  return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Save your binder</h1>'+
+  '<p class="sub">Sign in with your class code, a nickname and a PIN. No email needed. Use a nickname, not your real name.</p>'+
+  '<div class="tabs" role="tablist" style="margin:14px 0"><button class="tab'+(up?'':' on')+'" data-act="authtab" data-id="in">Sign in</button><button class="tab'+(up?' on':'')+'" data-act="authtab" data-id="up">New account</button></div>'+
+  '<form id="authform" autocomplete="off"><div class="fields">'+
+  '<div class="field"><label for="f-cls">Class code</label><input id="f-cls" maxlength="12" autocapitalize="characters" spellcheck="false" value="'+esc(f.cls)+'"><small>Ask your teacher. 3 to 12 letters or numbers.</small></div>'+
+  '<div class="field"><label for="f-nick">Nickname</label><input id="f-nick" maxlength="16" autocapitalize="none" spellcheck="false" value="'+esc(f.nick)+'"><small>2 to 16 letters or numbers.</small></div>'+
+  '<div class="field"><label for="f-pin">PIN</label><input id="f-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" value="'+esc(f.pin)+'"><small>'+(up?'Choose 4 to 6 digits. Remember it, there is no reset.':'Your 4 to 6 digit PIN.')+'</small></div></div>'+
+  '<label class="chk"><input type="checkbox" id="f-keep" '+(f.keep?'checked':'')+'> Keep me signed in on this device</label>'+bring+
+  (V.authErr?'<p class="err" role="alert">'+esc(V.authErr)+'</p>':'')+
+  '<div class="actions" style="margin-top:16px"><button class="btn" type="submit"'+(V.authBusy?' disabled':'')+'>'+(V.authBusy?'Working…':up?'Create account':'Sign in')+'</button><button class="btn ghost" type="button" data-act="home">Play as guest</button></div></form></section>';
+}
 function render(){
-  const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():binderHTML();
+  const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():V.screen==='account'?accountHTML():binderHTML();
   app.innerHTML=topHTML()+'<main>'+body+'</main>'+(V.modal?modalHTML():'');
   if(V.screen==='quiz'&&V.pick!=null){const nb=app.querySelector('[data-act="next"]');if(nb)nb.focus()}
 }
@@ -604,6 +655,9 @@ app.addEventListener('click',e=>{
   else if(a==='home'){V.screen='home';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='binder'){V.screen='binder';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='tab'){V.tab=id;render()}
+  else if(a==='account'){V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='authtab'){V.authTab=id;V.authErr='';render()}
+  else if(a==='signout'){Cloud.signOut()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
   else if(a==='again')startRound(V.roomId);
   else if(a==='open'){V.modal=id;render()}
@@ -614,10 +668,64 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&V.modal){V.modal=null;render();return}
   if(V.screen==='quiz'&&V.pick==null&&/^[1-4]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey){const i=+e.key-1;if(cur()&&cur().opts[i])answer(i)}
 });
+/* ---------- accounts (only when cloud.js is present and configured) ---------- */
+const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+app.addEventListener('input',e=>{
+  const id=e.target.id;
+  if(id==='f-cls')V.form.cls=e.target.value;
+  else if(id==='f-nick')V.form.nick=e.target.value;
+  else if(id==='f-pin')V.form.pin=e.target.value.replace(/\D/g,'');
+});
+app.addEventListener('change',e=>{
+  if(e.target.id==='f-keep')V.form.keep=e.target.checked;
+  if(e.target.id==='f-bring')V.form.bring=e.target.checked;
+});
+app.addEventListener('submit',async e=>{
+  if(e.target.id!=='authform')return;
+  e.preventDefault();
+  const f=V.form,c=norm(f.cls),n=norm(f.nick),pin=String(f.pin||'');
+  const up=V.authTab==='up';
+  if(!/^[a-z0-9]{3,12}$/.test(c)){V.authErr='Class code needs 3 to 12 letters or numbers.';render();return}
+  if(!/^[a-z0-9]{2,16}$/.test(n)){V.authErr='Nickname needs 2 to 16 letters or numbers.';render();return}
+  if(!/^\d{4,6}$/.test(pin)){V.authErr='PIN needs 4 to 6 digits.';render();return}
+  V.authErr='';V.authBusy=true;render();
+  try{
+    if(up){
+      const bring=f.bring&&guestCount()>0;const g=bring?readGuest():null;
+      await Cloud.signUp(c,n,pin,f.keep,g?{owned:g.owned||{},miss:g.miss||{},stars:g.stars||{},xp:g.xp||0,rounds:g.rounds||0,best:g.best||0}:null);
+      if(bring){try{localStorage.removeItem(KEY)}catch(x){}}
+    }else await Cloud.signIn(c,n,pin,f.keep);
+    V.form.pin='';
+  }catch(err){
+    const code=String(err&&err.code||'');
+    V.authErr=/email-already-in-use/.test(code)?'That nickname is taken in this class. Pick another, or use Sign in if it is yours.':
+      /invalid-credential|user-not-found|wrong-password|invalid-login/.test(code)?'The class code, nickname or PIN is not right.':
+      /too-many-requests/.test(code)?'Too many tries. Wait a minute and try again.':
+      /network/.test(code)?'Cannot reach the server. Check your internet connection.':
+      'Something went wrong. Try again.';
+  }
+  V.authBusy=false;render();
+});
+function wireCloud(){
+  Cloud.onStatus(s=>{SYNC=s;const m=document.getElementById('syncmsg');if(m)m.textContent=SYNCTXT[s]||''});
+  Cloud.onChange((user,prog)=>{
+    if(user){
+      ACCT={nick:user.nick,cls:user.cls};
+      try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck}}catch(e){}
+      applyProg(prog);
+      if(V.screen==='account'||V.screen==='quiz'||V.screen==='results')V.screen='home';
+      V.modal=null;render();
+    }else if(ACCT){
+      ACCT=null;SYNC='';loadGuest();V.screen='home';V.modal=null;render();
+    }else render();
+  });
+}
+if(window.Cloud)wireCloud();else addEventListener('cloud-ready',()=>{wireCloud();render()},{once:true});
 let rz=null;
 addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(V.screen!=='home')render()},180)});
 render();
 </script>
 
+<script type="module" src="cloud.js"></script>
 </body>
 </html>
