@@ -22,6 +22,7 @@ export class Backend {
     this.offline = false;             // true: every call fails with 'unavailable'
     this.denials = [];                // [{op, path, uid, reason}] every rules rejection, for assertions
     this.commits = 0;
+    this.timeScale = opts.timeScale || 1;   // rules time windows are multiplied by this (VS_TIME_SCALE in tests)
   }
   now() { return Date.now() + this.clockOffset; }
   advanceClock(ms) { this.clockOffset += ms; }
@@ -46,7 +47,7 @@ export class Backend {
       if (!this.anonymousEnabled) throw new FirebaseError('auth/admin-restricted-operation', 'This operation is restricted to administrators only.');
       const cur = this.authFor(token);
       if (cur && cur.anon) return this._session(this.users.get(cur.uid));
-      const u = { uid: 'anon_' + rand(20), email: null, anonymous: true };
+      const u = { uid: 'anon' + rand(24), email: null, anonymous: true };
       this.users.set(u.uid, u); return this._session(u);
     }
     const email = String(args.email || '').toLowerCase();
@@ -54,7 +55,7 @@ export class Backend {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new FirebaseError('auth/invalid-email', 'The email address is badly formatted.');
       if (this.byEmail.has(email)) throw new FirebaseError('auth/email-already-in-use', 'The email address is already in use by another account.');
       if (String(args.password || '').length < 6) throw new FirebaseError('auth/weak-password', 'Password should be at least 6 characters.');
-      const u = { uid: 'user_' + rand(22), email, password: args.password, anonymous: false };
+      const u = { uid: 'user' + rand(24), email, password: args.password, anonymous: false };
       this.users.set(u.uid, u); this.byEmail.set(email, u.uid); return this._session(u);
     }
     if (op === 'auth.signIn') {
@@ -82,7 +83,7 @@ export class Backend {
   _ctx(auth, time, post) {
     const pre = p => this._doc(p), after = p => (post && post.has(p) ? post.get(p) : pre(p));
     return {
-      uid: auth && auth.uid, anon: !!(auth && auth.anon), signedIn: !!auth, time,
+      ts: this.timeScale, uid: auth && auth.uid, anon: !!(auth && auth.anon), signedIn: !!auth, time,
       get: p => clone(pre(p)), exists: p => pre(p) !== null,
       getAfter: p => clone(after(p)), existsAfter: p => after(p) !== null
     };
@@ -236,6 +237,8 @@ export class Backend {
 
   // ---------- test/admin helpers (bypass rules) ----------
   adminSet(path, data) { const d = this._resolve(clone(data), undefined, this.now()); this.docs.set(path, { data: d, version: this._version(path) + 1 }); this._notify(new Set([path])); }
+  /** Merge top-level fields into an existing doc, bypassing rules (wire-form values; use T(ms) for timestamps). */
+  adminUpdate(path, patch) { this.adminSet(path, Object.assign({}, this._doc(path), patch)); }
   adminGet(path) { return clone(this._doc(path)); }
   adminList(path) { return this._queryDocs(path, []).out.map(d => ({ id: d.id, ...clone(d.data) })); }
   denialsFor(substr) { return this.denials.filter(d => d.reason.includes(substr)); }

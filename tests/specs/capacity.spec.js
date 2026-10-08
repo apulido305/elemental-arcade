@@ -7,7 +7,7 @@ test('20 scripted joiners fill a cap-20 arena and the 21st is rejected', async (
   const joiners = [];
   for (let i = 1; i < 20; i++) {
     const c = arena.client('p' + i);
-    joiners.push(i % 5 === 0 ? c.signInGuest(`Guest ${i}`) : c.signUp('class1', 'kid' + i));   // 3 guests among the 19
+    joiners.push(i % 5 === 0 ? c.signInGuest(["Bold Boron", "Swift Neon", "Calm Cobalt"][i / 5 - 1]) : c.signUp('class1', 'kid' + i));   // 3 guests among the 19
   }
   const kids = arena.clients.slice(1);
   await Promise.all(joiners);

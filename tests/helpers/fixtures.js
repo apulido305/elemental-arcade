@@ -54,14 +54,15 @@ export class Arena {
    * opts: width (390 phone | 1100 desktop), timeScale (window.VS_TIME_SCALE, default 0.1), firebase ('fake' | 'blocked'),
    *       height, fakeOptions (sdk options, e.g. {txMaxAttempts: 5})
    */
-  async device({ width = PHONE, height, timeScale = 0.1, firebase = 'fake', name = 'device' + (this.devices.length + 1), fakeOptions } = {}) {
+  async device({ width = PHONE, height, timeScale = 0.1, firebase = 'fake', name = 'device' + (this.devices.length + 1), fakeOptions, reducedMotion = false, fonts = false } = {}) {
     const phone = width < 600;
     const context = await this.browser.newContext({
-      viewport: { width, height: height || (phone ? 844 : 800) }, hasTouch: phone, deviceScaleFactor: 1, reducedMotion: 'no-preference'
+      viewport: { width, height: height || (phone ? 844 : 800) }, hasTouch: phone, deviceScaleFactor: 1, reducedMotion: reducedMotion ? 'reduce' : 'no-preference'
     });
-    await stubFonts(context);
+    if (!fonts) await stubFonts(context);   // fonts: true lets Google Fonts load (screenshots)
     if (firebase === 'fake') await useFakeFirebase(context, { options: fakeOptions });
     else if (firebase === 'blocked') await blockFirebase(context);
+    if (timeScale != null) this.backend.timeScale = timeScale;
     if (timeScale != null) await context.addInitScript(s => { window.VS_TIME_SCALE = s; }, timeScale);
     const page = await context.newPage();
     const d = new Device(this, context, page, name); d.firebase = firebase;

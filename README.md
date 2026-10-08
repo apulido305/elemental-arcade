@@ -32,7 +32,7 @@ One signed-in student hosts, picks a deck and room, and puts a 6-character code 
 - The shared clock is the match's `startAt` server timestamp. Nothing advances the game on a server; every tab runs the same schedule. School devices are assumed to be NTP-synced within a second or two.
 - A code works for any class. The class lobby only lists open arenas from the signed-in student's own class. Guests never see the lobby.
 - Rewards: each correct answer adds card XP (once per card per match), plus a placement bonus (1st +40, 2nd +25, 3rd +15, 4th to 10th +8, others who finished +5). Signed-in students keep a VS record (`VS 4-1 · streak 2`) on the home and account screens. Guests keep card XP in this browser only and have no record.
-- Disconnects: a student who goes quiet is marked away and stays on the ladder. If only one player is left, they win by forfeit. A lobby that never starts expires after 5 minutes.
+- Disconnects: a student who goes quiet is marked away and stays on the ladder. If only one player is left, they win by forfeit. A student whose page reloads or drops mid-match can type the same code to rejoin their seat with their points, unless they were silent for more than 20 seconds and got marked away. New players still cannot join once the countdown starts. A lobby that never starts expires after 5 minutes.
 - `window.VS_TIME_SCALE` is a test-only number that multiplies every VS duration.
 
 ### Teacher setup for VS Arena

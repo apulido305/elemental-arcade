@@ -65,8 +65,8 @@ export class ScriptedClient {
     const F = this.F, now = this.backend.now();
     return Object.assign({
       hostUid: this.uid, hostNick: this.nick, cls: this.cls, deck: 's20', room: 'mixed', seed: (Math.random() * 0x100000000) >>> 0, cap: 20,
-      allowGuests: true, listed: true, status: 'lobby', createdAt: F.serverTimestamp(), expireAt: F.Timestamp.fromMillis(now + 5 * 60 * 1000),
-      playerCount: 1, startAt: null, alive: 1, aggUid: this.uid, aggUntil: F.Timestamp.fromMillis(now + 30000), winnerUid: null, endedAt: null, rematch: null
+      allowGuests: true, listed: true, status: 'lobby', createdAt: F.serverTimestamp(), expireAt: F.Timestamp.fromMillis(now + 5 * 60 * 1000 * this.backend.timeScale),
+      playerCount: 1, startAt: null, alive: 1, aggUid: this.uid, aggUntil: F.Timestamp.fromMillis(now + 30000 * this.backend.timeScale), winnerUid: null, endedAt: null, rematch: null
     }, o);
   }
   /** Host creates a match + own player doc in one batch (what vs.js does). Returns the code. */

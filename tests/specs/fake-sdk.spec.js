@@ -71,7 +71,7 @@ test.describe('firestore fake', () => {
     expect(docSnaps[0]).toBe(2); expect(listSnaps[0]).toBe(2);
     const k2 = arena.client('k2'); await k2.signUp('class1', 'k2'); await k2.join(code);
     await expect.poll(() => docSnaps).toEqual([2, 3]); await expect.poll(() => listSnaps).toEqual([2, 3]);
-    await host.F.updateDoc(host.ref('matches', code), { alive: 2 });          // doc changes that don't touch the list
+    await host.F.updateDoc(host.ref('matches', code), { cap: 15 });          // doc changes that don't touch the list
     await expect.poll(() => docSnaps.length).toBe(3); expect(listSnaps.length).toBe(2);
     offList();
     const k3 = arena.client('k3'); await k3.signUp('class1', 'k3'); await k3.join(code);

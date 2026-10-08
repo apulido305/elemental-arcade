@@ -29,3 +29,10 @@ export async function openLobby(arena, o = {}) {
 }
 export async function signedKid(arena, nick, cls = 'class1') { const c = arena.client(nick); await c.signUp(cls, nick); return c; }
 export async function guest(arena, nick = 'Bold Boron') { const c = arena.client('guest-' + nick); await c.signInGuest(nick); return c; }
+
+/** Move the backend clock so that `now` is `frac` of the way into question q's 15 s window (scaled). Needs startAt set. */
+export function toQuestion(arena, code, q, frac = 0.1) {
+  const m = arena.backend.adminGet('matches/' + code), ts = arena.backend.timeScale;
+  const target = m.startAt.__ts + (5000 + q * 17500 + frac * 15000) * ts;
+  arena.backend.advanceClock(target - arena.backend.now());
+}

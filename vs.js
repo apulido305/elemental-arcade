@@ -415,7 +415,12 @@ async function joinTx(code, nick, guest) {
       if (!ms.exists()) throw vsErr('missing');
       const m = ms.data();
       const mine = await tx.get(pref);
-      if (mine.exists()) { if (m.status === 'lobby') return; throw vsErr('started'); }
+      if (mine.exists()) {
+        if (m.status === 'lobby') return;
+        // Already seated (a reload or a dropped connection): resume, unless marked abandoned. Not a late join.
+        if (m.status === 'playing' && !mine.data().abandoned) { tx.update(pref, { left: false, lastSeen: F.serverTimestamp() }); return; }
+        throw vsErr('started');
+      }
       if (m.status === 'expired') throw vsErr('expired');
       if (m.status === 'lobby' && toMs(m.expireAt) && Date.now() > toMs(m.expireAt)) { expireAfter = true; throw vsErr('expired'); }
       if (m.status === 'playing') throw vsErr('started');
@@ -720,7 +725,7 @@ function onPhase(ph, prev) {
 function answer(i) {
   if (!R || R.view !== 'play' || !R.phase || R.phase.name !== 'question') return;
   const idx = R.phase.index;
-  if (R.answers[idx] || R.kicked || (R.players[R.uid] && R.players[R.uid].abandoned)) return;
+  if (R.answers[idx] || R.kicked || (R.players[R.uid] && (R.players[R.uid].abandoned || R.players[R.uid].answeredQ >= idx))) return;
   const q = R.round && R.round[idx]; if (!q || !(i >= 0 && i < q.options.length)) return;
   const elapsed = Math.min(Q_MS(), Math.max(0, Date.now() - R.shownAt));
   const correct = i === q.correct, pts = scoreAnswer(correct, elapsed);
@@ -935,7 +940,9 @@ const AGG_MS = () => AGG_BASE * TS();
 function aggCheck() {
   // Cheap local check on every players snapshot, but only the aggregator acts.
   if (!R || R.view !== 'play' || R.guest || !R.match || R.match.aggUid !== R.uid || R.ending) return;
-  const alive = liveRows().filter(p => !gone(p));
+  // `left` alone is not a forfeit (a reload writes it, then resumes). Only `abandoned` counts, which aggTick sets
+  // once a player has been silent past the stale window.
+  const alive = liveRows().filter(p => !p.abandoned);
   const total = liveRows().filter(p => !hidden(p)).length;
   if (total >= 2 && alive.length === 1) endMatch('done', alive[0].uid);
   else if (alive.length === 0 && total > 0) endMatch('abandoned', null);
@@ -966,7 +973,7 @@ async function aggTick() {
     const lastDone = ph.name === 'reveal' || ph.name === 'done' ? (ph.name === 'done' ? N_Q - 1 : ph.index) : (ph.index != null ? ph.index - 1 : -1);
     if (lastDone >= 0) {
       for (const p of liveRows()) {
-        if (p.uid === R.uid || gone(p)) continue;
+        if (p.uid === R.uid || p.abandoned) continue;
         const pr = R.presence && R.presence[p.uid];
         const sig = Math.max(pr ? (pr.at ? toMs(pr.at) : now) : 0, toMs(p.lastSeen) || 0, toMs(p.joinedAt) || 0);
         if (now - sig > STALE_BASE * TS() && (p.answeredQ == null ? -1 : p.answeredQ) < lastDone) {

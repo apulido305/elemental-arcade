@@ -76,7 +76,7 @@ test('fake backend is shared across devices (separate contexts) with live snapsh
   expect(err).toEqual({ name: 'FirebaseError', code: 'permission-denied', isErr: true });
 });
 
-test('anonymous session: gone after signOut and on the next load; local sessions survive', async ({ arena }) => {
+test('anonymous session: session persistence, gone after signOut and in a new tab; local sessions survive', async ({ arena }) => {
   const dev = await arena.device({ width: PHONE });
   await dev.goto('/');
   // guest join flow primitives, exactly as SPEC: session persistence + signInAnonymously.
@@ -89,10 +89,9 @@ test('anonymous session: gone after signOut and on the next load; local sessions
   });
   const guestUid = first.uid;
   expect(first).toMatchObject({ anon: true, email: null, l: null, s: true });              // session persistence only, nothing in localStorage
-  // The app clears a leftover guest on load ("next load has no user"): the session must not survive a reload.
+  // Same tab reload keeps a session-persistence user (the product signs guests out when a match ends, not on load).
   await dev.page.reload(); await dev.cloudReady();
-  await expect.poll(() => dev.currentUser()).toBeNull();
-  expect(await dev.page.evaluate(() => sessionStorage.getItem('fakeauth:user'))).toBeNull();
+  expect(await dev.currentUser()).toMatchObject({ uid: guestUid, isAnonymous: true });
   // a new tab (new load, empty sessionStorage) starts signed out
   const tab2 = await dev.context.newPage(); tab2.on('pageerror', e => dev.errors.push(String(e)));
   await tab2.goto(arena.origin + '/'); await tab2.waitForFunction(() => !!window.Cloud);
