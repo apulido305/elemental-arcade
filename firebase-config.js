@@ -1,9 +1,8 @@
-// Paste your Firebase web app config here (Firebase console > Project settings > Your apps > Web app).
-// These values are safe to publish. Access is controlled by firestore.rules, not by hiding this file.
-// Until the values below are replaced, the game works as before with no sign-in.
+// Firebase web app config. These values are safe to publish.
+// Access is controlled by firestore.rules, not by hiding this file.
 export const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  appId: 'YOUR_APP_ID'
+  apiKey: 'AIzaSyCqBbyyaUiPCxyew_as1QBBdLvL_ltS5Ng',
+  authDomain: 'elemental-arc.firebaseapp.com',
+  projectId: 'elemental-arc',
+  appId: '1:487031078760:web:bf2a8417493250579da0dd'
 };
