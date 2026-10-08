@@ -1,13 +1,324 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each signed-in student can read and write only their own save, and nothing else.
+
+    // ---------------------------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------------------------
+    function signedIn() { return request.auth != null; }
+
+    // Guests in VS Arena use Firebase Anonymous Auth. They are signed in, but they are not accounts.
+    function isAnon() { return request.auth.token.firebase.sign_in_provider == 'anonymous'; }
+    function isAccount() { return signedIn() && !isAnon(); }
+
+    function playerDoc(uid) { return /databases/$(database)/documents/players/$(uid); }
+    function matchPath(code) { return /databases/$(database)/documents/matches/$(code); }
+    function seatPath(code, uid) { return /databases/$(database)/documents/matches/$(code)/players/$(uid); }
+
+    function isParticipant(code) { return signedIn() && exists(seatPath(code, request.auth.uid)); }
+
+    function answerPath(code, uid, q) { return /databases/$(database)/documents/matches/$(code)/answers/$(uid + '_' + string(q)); }
+
+    // Match clock (must match vs.js): question 0 appears 5 s after startAt, each question is 15 s plus a 2.5 s reveal,
+    // so ten questions end 180 s after startAt. Devices are assumed NTP-synced within a couple of seconds.
+    function qOpensAt(m, q) { return m.startAt + duration.value(5000 + q * 17500, 'ms'); }
+    function clockOver(m) { return request.time > m.startAt + duration.value(178000, 'ms'); }
+
+    function codeOk(code) { return code.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$'); }
+
+    // ---------------------------------------------------------------------------------------------
+    // /players/{uid}: each signed-in student reads and writes only their own save.
+    // Anonymous guests never read or write here (guests have no stored progress).
+    // Progress may carry the VS record (vs) and the time it was last written (vsAt).
+    // ---------------------------------------------------------------------------------------------
     match /players/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow read: if isAccount() && request.auth.uid == uid;
+      allow create, update: if isAccount() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['progress', 'nick', 'cls', 'updated'])
-        && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best']);
+        && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt'])
+        && (!('vs' in request.resource.data.progress)
+            || (request.resource.data.progress.vs is map
+                && request.resource.data.progress.vs.keys().hasOnly(['w', 'l', 'streak', 'best', 'played'])))
+        && (!('vsAt' in request.resource.data.progress) || request.resource.data.progress.vsAt is number);
       allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // /matches/{code}: one VS arena. The 6-character code is the secret needed to join.
+    // ---------------------------------------------------------------------------------------------
+    match /matches/{code} {
+
+      // Anyone signed in (guests too) can read ONE match if they know its code. That is how Join works.
+      allow get: if signedIn();
+
+      // Listing is the class lobby. Accounts only, never guests, and only open listed lobbies of the
+      // caller's own class. A guest cannot enumerate matches.
+      allow list: if isAccount()
+        && resource.data.listed == true
+        && resource.data.status == 'lobby'
+        && resource.data.cls == get(playerDoc(request.auth.uid)).data.cls;
+
+      // Create: the host only, a real account (never a guest), with exactly this field set and
+      // safe starting values. cap is 2..20. cls and hostNick must match the host's own /players doc.
+      // The host's own seat (matches/{code}/players/{uid}) is created in the same batch.
+      allow create: if isAccount()
+        && codeOk(code)
+        && request.resource.data.keys().hasOnly(['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests',
+             'listed', 'status', 'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil',
+             'winnerUid', 'endedAt', 'rematch'])
+        && request.resource.data.keys().hasAll(['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests',
+             'listed', 'status', 'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil',
+             'winnerUid', 'endedAt', 'rematch'])
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.cls == get(playerDoc(request.auth.uid)).data.cls
+        && request.resource.data.hostNick == get(playerDoc(request.auth.uid)).data.nick
+        && request.resource.data.deck in ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all']
+        && request.resource.data.room in ['ability', 'symbol', 'number', 'config', 'table', 'type', 'lab', 'mixed']
+        && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
+        && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
+        && request.resource.data.allowGuests is bool
+        && request.resource.data.listed is bool
+        && request.resource.data.status == 'lobby'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt <= request.time + duration.value(6, 'm')
+        && request.resource.data.playerCount == 1
+        && request.resource.data.startAt == null
+        && request.resource.data.alive == 1
+        && request.resource.data.aggUid == request.auth.uid
+        && request.resource.data.aggUntil is timestamp
+        && request.resource.data.winnerUid == null
+        && request.resource.data.endedAt == null
+        && request.resource.data.rematch == null;
+
+      // Update. Several narrow cases, any one of which may allow the write. Status only moves forward:
+      // lobby -> playing | expired, playing -> done | abandoned. Nothing ever moves back.
+      allow update:
+        // 1. Expiry: any signed-in user may retire a lobby once its time is up (nothing else may change).
+        if (signedIn()
+            && resource.data.status == 'lobby'
+            && request.time > resource.data.expireAt
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            && request.resource.data.status == 'expired')
+
+        // 2. Host edits lobby settings. Cap stays 2..20 and cannot drop below the people already seated.
+        || (request.auth != null
+            && request.auth.uid == resource.data.hostUid
+            && resource.data.status == 'lobby'
+            && request.resource.data.status == 'lobby'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deck', 'room', 'seed', 'cap', 'allowGuests', 'listed'])
+            && request.resource.data.deck in ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all']
+            && request.resource.data.room in ['ability', 'symbol', 'number', 'config', 'table', 'type', 'lab', 'mixed']
+            && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
+            && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
+            && request.resource.data.cap >= resource.data.playerCount
+            && request.resource.data.allowGuests is bool
+            && request.resource.data.listed is bool)
+
+        // 3. Host starts the match (lobby -> playing) and stamps the shared clock with server time.
+        || (request.auth != null
+            && request.auth.uid == resource.data.hostUid
+            && resource.data.status == 'lobby'
+            && request.resource.data.status == 'playing'
+            && resource.data.playerCount >= 2
+            && request.time < resource.data.expireAt
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'startAt', 'aggUid', 'aggUntil', 'alive'])
+            && request.resource.data.startAt == request.time)
+
+        // 4. Host announces the rematch code on a finished match (once).
+        || (request.auth != null
+            && request.auth.uid == resource.data.hostUid
+            && resource.data.status == 'done'
+            && resource.data.rematch == null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rematch'])
+            && request.resource.data.rematch is string
+            && codeOk(request.resource.data.rematch))
+
+        // 5. Seated players, while playing: end the match (done | abandoned), record the winner, publish
+        //    the alive count, and claim or renew the aggregator role (only for yourself, only for accounts).
+        || (isParticipant(code)
+            && resource.data.status == 'playing'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winnerUid', 'endedAt', 'alive', 'aggUid', 'aggUntil'])
+            && (request.resource.data.status == 'playing'
+                || request.resource.data.status == 'abandoned'
+                || (request.resource.data.status == 'done' && resource.data.winnerUid == null))
+            // Before the ten questions are over, only an account (the aggregator, on a forfeit or when
+            // everyone left) may end the match. A guest cannot cut a match short.
+            && (request.resource.data.status == 'playing' || isAccount() || clockOver(resource.data))
+            && (request.resource.data.status != 'done' || 'winnerUid' in request.resource.data.diff(resource.data).affectedKeys())
+            && (!('winnerUid' in request.resource.data.diff(resource.data).affectedKeys())
+                || (request.resource.data.status == 'done'
+                    && request.resource.data.winnerUid is string
+                    && exists(seatPath(code, request.resource.data.winnerUid))))
+            // Ending the match must stamp endedAt with server time, and only ending may.
+            && (request.resource.data.status == 'playing'
+                ? !('endedAt' in request.resource.data.diff(resource.data).affectedKeys())
+                : request.resource.data.endedAt == request.time)
+            && (!('alive' in request.resource.data.diff(resource.data).affectedKeys())
+                || (isAccount() && request.resource.data.alive is int && request.resource.data.alive >= 0 && request.resource.data.alive <= 20))
+            && (!('aggUid' in request.resource.data.diff(resource.data).affectedKeys())
+                || (isAccount() && request.resource.data.aggUid == request.auth.uid && resource.data.aggUntil < request.time))
+            && (!('aggUntil' in request.resource.data.diff(resource.data).affectedKeys())
+                || (isAccount() && request.resource.data.aggUid == request.auth.uid
+                    && request.resource.data.aggUntil is timestamp
+                    && request.resource.data.aggUntil <= request.time + duration.value(2, 'm'))))
+
+        // 6. Seat count: +1 when your own new seat is created, -1 when your own seat is deleted, lobby only,
+        //    never above cap. The seat write happens in the same transaction.
+        || (signedIn()
+            && resource.data.status == 'lobby'
+            && request.resource.data.status == 'lobby'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount'])
+            && request.resource.data.playerCount is int
+            && ((request.resource.data.playerCount == resource.data.playerCount + 1
+                 && request.resource.data.playerCount <= resource.data.cap
+                 && !exists(seatPath(code, request.auth.uid))
+                 && existsAfter(seatPath(code, request.auth.uid)))
+                || (request.resource.data.playerCount == resource.data.playerCount - 1
+                    && request.resource.data.playerCount >= 0
+                    && exists(seatPath(code, request.auth.uid))
+                    && !existsAfter(seatPath(code, request.auth.uid)))));
+
+      allow delete: if false;
+
+      // -------------------------------------------------------------------------------------------
+      // matches/{code}/players/{uid}: a seat. Holds the public scoreboard row for one player.
+      // -------------------------------------------------------------------------------------------
+      match /players/{uid} {
+        // Only people seated in this match can read the board. A seat holder may also read their own
+        // (missing) seat, which is how a join transaction checks "already here".
+        allow read: if signedIn() && (request.auth.uid == uid || isParticipant(code));
+
+        // Join (or host's first seat). Only for yourself, only with this exact field set and starting values.
+        // Guests: guest == true is forced by provider, and they need allowGuests on the match.
+        // Accounts: nick must be the nickname in their own /players doc. Guests: a generated name only.
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
+               'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+          && request.resource.data.keys().hasAll(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
+               'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+          && request.resource.data.guest == isAnon()
+          && request.resource.data.joinedAt == request.time
+          && request.resource.data.score == 0
+          && request.resource.data.correct == 0
+          && request.resource.data.totalMs == 0
+          && request.resource.data.answeredQ == -1
+          && request.resource.data.abandoned == false
+          && request.resource.data.left == false
+          && request.resource.data.streak == 0
+          && request.resource.data.reaction == null
+          && request.resource.data.reactionAt == null
+          && (isAnon()
+                ? (request.resource.data.nick is string && request.resource.data.nick.matches('^[A-Z][a-z]{2,11} [A-Z][a-z]{2,11}$'))
+                : request.resource.data.nick == get(playerDoc(request.auth.uid)).data.nick)
+          && (
+               // Host creating the match and their own seat in one batch.
+               (!exists(matchPath(code))
+                && getAfter(matchPath(code)).data.hostUid == request.auth.uid
+                && getAfter(matchPath(code)).data.playerCount == 1)
+               ||
+               // Everyone else: open lobby, a free seat, not expired, guests only if allowed.
+               (exists(matchPath(code))
+                && get(matchPath(code)).data.status == 'lobby'
+                && get(matchPath(code)).data.playerCount < get(matchPath(code)).data.cap
+                && request.time < get(matchPath(code)).data.expireAt
+                && (!isAnon() || get(matchPath(code)).data.allowGuests == true)
+                && getAfter(matchPath(code)).data.playerCount == get(matchPath(code)).data.playerCount + 1)
+             );
+
+        // Update.
+        allow update: if
+          // Your own row: anything except identity fields. answeredQ only goes up. Score only grows, by at
+          // most one answer's worth per write, and stays within the maximum for ten questions.
+          (signedIn()
+            && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
+                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'score', 'correct', 'totalMs',
+                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+            && request.resource.data.answeredQ >= resource.data.answeredQ
+            && request.resource.data.answeredQ <= 9
+            // Once marked abandoned, you stay abandoned (no rejoining that match).
+            && !(resource.data.abandoned == true && request.resource.data.abandoned != true)
+            // Score, correct, totalMs and answeredQ move only together with a brand-new answer doc written in the
+            // same batch, and by exactly that answer's values. No answer, no points.
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['score', 'correct', 'totalMs', 'answeredQ'])
+                || (request.resource.data.answeredQ > resource.data.answeredQ
+                    && !exists(answerPath(code, uid, request.resource.data.answeredQ))
+                    && existsAfter(answerPath(code, uid, request.resource.data.answeredQ))
+                    && request.resource.data.score == resource.data.score + getAfter(answerPath(code, uid, request.resource.data.answeredQ)).data.points
+                    && request.resource.data.correct == resource.data.correct + (getAfter(answerPath(code, uid, request.resource.data.answeredQ)).data.correct ? 1 : 0)
+                    && request.resource.data.totalMs == resource.data.totalMs + getAfter(answerPath(code, uid, request.resource.data.answeredQ)).data.elapsedMs))
+            && request.resource.data.score >= resource.data.score
+            && request.resource.data.score - resource.data.score <= 150
+            && request.resource.data.score <= 1500
+            && request.resource.data.correct >= resource.data.correct
+            && request.resource.data.correct <= 10
+            && request.resource.data.totalMs >= resource.data.totalMs
+            && request.resource.data.streak >= 0 && request.resource.data.streak <= 10
+            && (request.resource.data.reaction == null
+                || request.resource.data.reaction in ['nice', 'hmm', 'fire', 'gg', 'oops'])
+            && (get(matchPath(code)).data.status in ['lobby', 'playing']
+                || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'reaction', 'reactionAt', 'left'])))
+          ||
+          // Someone else's row: the aggregator may only mark a stale player abandoned, while the match is playing.
+          // (Deliberate exception to "only your own doc".)
+          (isParticipant(code)
+            && isAccount()
+            && request.auth.uid != uid
+            && get(matchPath(code)).data.status == 'playing'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['abandoned'])
+            && request.resource.data.abandoned == true);
+
+        // Leaving the lobby deletes your own seat (the seat count drops in the same transaction).
+        // Once the match starts, seats stay for the record and you set left = true instead.
+        allow delete: if signedIn()
+          && request.auth.uid == uid
+          && get(matchPath(code)).data.status == 'lobby';
+      }
+
+      // -------------------------------------------------------------------------------------------
+      // matches/{code}/answers/{uid}_{q}: one answer per player per question. Never updated or deleted,
+      // and only the owner can read it, so nobody sees anyone else's choice.
+      // -------------------------------------------------------------------------------------------
+      match /answers/{aid} {
+        allow read: if signedIn() && aid.split('_')[0] == request.auth.uid;
+
+        allow create: if isParticipant(code)
+          && get(matchPath(code)).data.status == 'playing'
+          && request.resource.data.keys().hasOnly(['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'])
+          && request.resource.data.keys().hasAll(['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'])
+          && request.resource.data.q is int && request.resource.data.q >= 0 && request.resource.data.q <= 9
+          && aid == request.auth.uid + '_' + string(request.resource.data.q)
+          && request.resource.data.choice is int && request.resource.data.choice >= 0 && request.resource.data.choice <= 3
+          && request.resource.data.elapsedMs is number && request.resource.data.elapsedMs >= 0
+          && request.resource.data.correct is bool
+          && request.resource.data.points is int && request.resource.data.points >= 0 && request.resource.data.points <= 150
+          && (request.resource.data.correct || request.resource.data.points == 0)
+          && getAfter(seatPath(code, request.auth.uid)).data.answeredQ == request.resource.data.q
+          && get(seatPath(code, request.auth.uid)).data.abandoned != true
+          && request.resource.data.elapsedMs <= 15000
+          // Only while that question is on screen (2 s grace each side for clock drift): no answering ahead,
+          // and no answering after the reveal has shown the right option.
+          && request.time >= qOpensAt(get(matchPath(code)).data, request.resource.data.q) - duration.value(2000, 'ms')
+          && request.time <= qOpensAt(get(matchPath(code)).data, request.resource.data.q) + duration.value(17000, 'ms');
+
+        allow update, delete: if false;
+      }
+
+      // -------------------------------------------------------------------------------------------
+      // matches/{code}/presence/{uid}: a heartbeat. Written by its owner, read by seated players
+      // (in practice only the one aggregator listens).
+      // -------------------------------------------------------------------------------------------
+      match /presence/{uid} {
+        allow read: if isParticipant(code);
+        allow create, update: if signedIn()
+          && request.auth.uid == uid
+          && isParticipant(code)
+          && request.resource.data.keys().hasOnly(['at']);
+        allow delete: if false;
+      }
     }
   }
 }
