@@ -314,8 +314,25 @@ function save(){
 }
 
 /* ---------- helpers ---------- */
-const rnd=n=>Math.floor(Math.random()*n);
-const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+/* Question randomness goes through RNG. Solo play leaves it as Math.random; VS Arena swaps in a seeded
+   generator inside makeQ so every client builds the identical round. */
+let RNG=Math.random;
+const rand=()=>RNG();
+const rnd=n=>Math.floor(rand()*n);
+function mulberry32(seed){
+  let a=seed>>>0;
+  return function rng(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function shuffle(list,rng){
+  const r=rng||rand;const a=list.slice();
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));const t=a[i];a[i]=a[j];a[j]=t}
+  return a;
+}
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const themeOf=it=>THEMES[it.family]||THEMES.Blank;
 const symHTML=it=>(it.pre?'<sup>'+esc(it.pre)+'</sup>':'')+esc(it.sym)+(it.post?'<sup>'+esc(it.post)+'</sup>':'');
@@ -422,7 +439,8 @@ const lockSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const atomLogo='<svg width="40" height="40" viewBox="-70 -70 140 140" fill="none" aria-hidden="true"><ellipse rx="64" ry="24" stroke="#7fd1f0" stroke-width="7"/><ellipse rx="64" ry="24" stroke="#f3dd7a" stroke-width="7" transform="rotate(60)"/><ellipse rx="64" ry="24" stroke="#f2a8a3" stroke-width="7" transform="rotate(120)"/><circle cx="0" cy="0" r="14" fill="#fdf6d8"/><circle cx="0" cy="0" r="7" fill="#e0b81a"/></svg>';
 
 /* ---------- question generators ---------- */
-function dpool(it){const d=deckItems(V.deckId).filter(x=>x.cat===it.cat);return d.length>=6?d:ALL.filter(x=>x.cat===it.cat)}
+let QDECK=null; // deck used for decoys; buildRound sets it, solo uses V.deckId
+function dpool(it){const d=deckItems(QDECK||V.deckId).filter(x=>x.cat===it.cat);return d.length>=6?d:ALL.filter(x=>x.cat===it.cat)}
 function mkOpts(ok,dist){
   const seen=new Set([ok]);const d=[];
   for(const x of dist){if(!seen.has(x)){seen.add(x);d.push(x)}if(d.length===3)break}
@@ -448,9 +466,9 @@ const GEN={
   },
   symbol(it){
     const pool=dpool(it).filter(x=>x.id!==it.id);
-    const score=x=>(x.sym[0]===it.sym[0]?3:0)+(x.sym===it.sym?4:0)+(x.sym.length===it.sym.length?1:0)+Math.random()*2.5;
+    const score=x=>(x.sym[0]===it.sym[0]?3:0)+(x.sym===it.sym?4:0)+(x.sym.length===it.sym.length?1:0)+rand()*2.5;
     const sorted=pool.map(x=>[score(x),x]).sort((a,b)=>b[0]-a[0]).map(p=>p[1]);
-    if(Math.random()<.5){
+    if(rand()<.5){
       const opts=mkOpts(symHTML(it),sorted.map(symHTML));if(!opts)return null;
       return{prompt:'Which symbol belongs to '+esc(it.name)+'?',clue:tileScaled(it,{neutral:true,hide:{sym:true}}),opts,
         exp:'<p><b>'+esc(it.name)+'</b> is written <b>'+symHTML(it)+'</b>.</p>'};
@@ -460,11 +478,11 @@ const GEN={
       exp:'<p><b>'+symHTML(it)+'</b> stands for <b>'+esc(it.name)+'</b>.</p>'};
   },
   number(it){
-    if(Math.random()<.5){
+    if(rand()<.5){
       return{prompt:'What is the atomic number of '+esc(it.name)+'?',clue:tileScaled(it,{neutral:true,hide:{z:true}}),opts:numOpts(it.zn,1,118),
         exp:'<p><b>'+esc(it.name)+'</b> has atomic number <b>'+it.zn+'</b>, so it has '+it.zn+' protons.</p>'};
     }
-    const pool=dpool(it).filter(x=>x.id!==it.id).sort((a,b)=>Math.abs(a.zn-it.zn)+Math.random()*4-Math.abs(b.zn-it.zn)-Math.random()*4);
+    const pool=dpool(it).filter(x=>x.id!==it.id).sort((a,b)=>Math.abs(a.zn-it.zn)+rand()*4-Math.abs(b.zn-it.zn)-rand()*4);
     const opts=mkOpts(esc(it.name),pool.map(x=>esc(x.name)));if(!opts)return null;
     return{prompt:'Which element has atomic number '+it.zn+'?',clue:tileScaled(it,{neutral:true,hide:{sym:true,name:true,mass:true,shells:true}}),opts,mono:false,
       exp:'<p>Atomic number '+it.zn+' is <b>'+esc(it.name)+'</b> ('+esc(it.sym)+').</p>'};
@@ -477,7 +495,7 @@ const GEN={
         exp:'<p>The <b>'+esc(it.name)+'</b> is <b>'+esc(it.config.toLowerCase())+'</b>.</p>'};
     }
     const cand=dpool(it).concat(ALL.filter(x=>x.cat==='el'&&x.zn<=36)).filter(x=>x.config&&x.config!==it.config);
-    const sorted=cand.map(x=>[Math.abs(x.zn-it.zn)+Math.random()*5,x]).sort((a,b)=>a[0]-b[0]).map(p=>esc(p[1].config));
+    const sorted=cand.map(x=>[Math.abs(x.zn-it.zn)+rand()*5,x]).sort((a,b)=>a[0]-b[0]).map(p=>esc(p[1].config));
     const opts=mkOpts(esc(it.config),sorted);if(!opts)return null;
     const pr=it.cat==='el'?'Which electron configuration belongs to '+esc(it.name)+'?':it.cat==='iso'?'Which electron configuration does a neutral '+esc(it.name)+' atom have?':'Which electron configuration does the '+esc(it.name)+' have?';
     const tip=it.cat==='cat'?' A cation lost electrons from its outer shell.':it.cat==='an'?' An anion gained electrons, so its outer shell fills up.':'';
@@ -522,7 +540,7 @@ const GEN={
   },
   lab(it){
     if(it.cat==='poly'){
-      if(Math.random()<.5){
+      if(rand()<.5){
         const a=+it.s1v;
         return{prompt:'How many atoms are in one '+esc(it.name)+'?',clue:tileScaled(it,{neutral:true}),opts:numOpts(a,2,9),
           exp:'<p>One <b>'+esc(it.name)+'</b> ('+symHTML(it)+') has <b>'+a+'</b> atoms bonded together.</p>'};
@@ -532,7 +550,7 @@ const GEN={
         opts:cs.map(h=>({h:esc(h),ok:h===it.s3v})),
         exp:'<p>The <b>'+esc(it.name)+'</b> has a charge of <b>'+esc(it.s3v)+'</b>.</p>'};
     }
-    const target=Math.random()<.5?'neutrons':'electrons';
+    const target=rand()<.5?'neutrons':'electrons';
     const p=it.zn,n=+it.s2v,e=+it.s3v;let ans,why;
     if(target==='neutrons'){
       ans=n;
@@ -555,11 +573,32 @@ function supports(it,t){
     default:return true;
   }
 }
-function makeQ(it,room){
-  const types=shuffle(room.types.filter(t=>supports(it,t)));
-  for(const t of types){let q=null;try{q=GEN[t](it)}catch(e){q=null}if(q){q.item=it;q.type=t;return q}}
-  return null;
+function makeQ(it,room,rng){
+  const prev=RNG;RNG=rng||Math.random;
+  try{
+    const types=shuffle(room.types.filter(t=>supports(it,t)));
+    for(const t of types){let q=null;try{q=GEN[t](it)}catch(e){q=null}if(q){q.item=it;q.type=t;return q}}
+    return null;
+  }finally{RNG=prev}
 }
+/* VS Arena: the same 10 questions for everyone, locked to the match seed. Pure apart from reading the card data.
+   Samples without replacement; repeats a card only when the pool has fewer than 10. */
+function buildRound(deckId,roomId,seed){
+  const room=roomOf(roomId);const rng=mulberry32(seed);
+  const prevDeck=QDECK;QDECK=deckId;
+  try{
+    const pool=roomPool(room,deckId);if(!pool.length)return [];
+    let order=shuffle(pool,rng);
+    while(order.length<10)order=order.concat(shuffle(pool,rng));
+    const out=[];
+    for(let i=0;i<order.length&&out.length<10;i++){
+      const q=makeQ(order[i],room,rng);if(!q)continue;
+      out.push({prompt:q.prompt,clue:q.clue,options:q.opts.map(o=>o.h),correct:q.opts.findIndex(o=>o.ok),cardId:q.item.id,type:q.type,mono:!!q.mono,exp:q.exp});
+    }
+    return out;
+  }finally{QDECK=prevDeck}
+}
+window.buildRound=buildRound;window.mulberry32=mulberry32;
 
 /* ---------- state ---------- */
 const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
