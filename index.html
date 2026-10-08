@@ -197,6 +197,38 @@ h1,h2,h3{margin:0;font-weight:400}
 .bar2 i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--gold))}
 .win.up{background:linear-gradient(90deg,#fff3b0,#f3dd7a)}
 .ups{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--pw,200px),1fr));gap:16px;justify-items:center}
+/* motion */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.06)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+@keyframes deal{from{opacity:0;transform:translateY(28px) rotate(-5deg) scale(.9)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 0 rgba(243,221,122,0))}50%{filter:drop-shadow(0 0 16px rgba(243,221,122,.95))}}
+@keyframes starpop{0%{transform:scale(0) rotate(-40deg);opacity:0}60%{transform:scale(1.3) rotate(8deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+@keyframes pulse{50%{transform:scale(1.2)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+main.enter>*{animation:fadeIn .3s backwards}
+.enter .room{animation:rise .4s backwards;animation-delay:calc(var(--i,0)*45ms + 100ms)}
+.enter .cell,.enter .slot{animation:fadeIn .35s backwards;animation-delay:calc(var(--i,0)*14ms)}
+.enter .flip{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) backwards;animation-delay:calc(var(--i,0)*.12s + .35s)}
+.enter .stat{animation:rise .4s backwards}
+.enter .stat:nth-child(2){animation-delay:.08s}.enter .stat:nth-child(3){animation-delay:.16s}.enter .stat:nth-child(4){animation-delay:.24s}
+.opt.right{animation:pop .4s}
+.opt.wrong{animation:shake .42s}
+.fb{animation:rise .35s backwards}
+.cw.deal{animation:deal .5s cubic-bezier(.2,.9,.3,1.15) backwards}
+.cw.levelup{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) backwards,glow 1.1s .55s 2}
+.stars.big svg.on{animation:starpop .55s backwards;animation-delay:calc(var(--k,0)*.2s + .25s)}
+.stars.big svg:not(.on){animation:fadeIn .5s backwards}
+.lvup{animation:pop .6s .3s backwards}
+.pip.new{animation:pop .35s}
+.hudstat .hot b{display:inline-block;animation:pulse .9s ease-in-out infinite}
+.logo svg{animation:spin 40s linear infinite}
+.xp i,.bar2 i{transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.modal{animation:fadeIn .18s backwards}
+.modal .cw{animation:deal .45s cubic-bezier(.2,.9,.3,1.15) backwards}
+.grid .cardbtn:hover .cw{transform:translateY(-5px) scale(1.04)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media (prefers-reduced-motion:reduce){.cw.anim .foil,.cw.anim .foil::after,.cw.anim .spark{animation:none}.cw{transition:none}}
 @media (prefers-reduced-motion:reduce){.flip-in{transition:none}.btn,.opt,.room,.deck{transition:none}}
 </style>
@@ -367,7 +399,7 @@ function cardInner(it,tier){
   '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1.5px solid '+c.dark+';border-radius:6px;background:'+(full?'rgba(255,255,255,.9)':c.tint)+'">'+lab(it.s1l,it.s1v,true)+lab(it.s2l,it.s2v)+lab(it.s3l,it.s3v)+'</div>'+
   '</div>'+(holo?'<div class="foil'+(gold?' gold':'')+'"></div><div class="spark"></div>':'')+'</div>';
 }
-const cardHTML=(it,s,tier,anim)=>'<div class="cw'+(anim?' anim':'')+'" style="--cs:'+s+'">'+cardInner(it,tier)+'</div>';
+const cardHTML=(it,s,tier,anim,cls)=>'<div class="cw'+(anim?' anim':'')+(cls?' '+cls:'')+'" style="--cs:'+s+'">'+cardInner(it,tier)+'</div>';
 let BACKCELLS=null;
 function backInner(){
   if(!BACKCELLS){
@@ -384,8 +416,8 @@ function backInner(){
   '<div style="margin-top:4px;font-family:\'Atkinson Hyperlegible\',sans-serif;font-weight:700;font-size:9px;letter-spacing:3px;color:#f3dd7a;line-height:1.2;padding-left:3.5px">PERIODIC TABLE CARDS</div>'+
   '<div style="margin-top:auto;width:100%;display:grid;grid-template-columns:repeat(18,minmax(0,1fr));gap:1.5px">'+BACKCELLS+'</div></div></div>';
 }
-const starSVG=(on,cls)=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="'+(on?'#f3dd7a':'rgba(0,0,0,.32)')+'" stroke="'+(on?'#a98d1a':'rgba(255,255,255,.18)')+'" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-const starsHTML=(n,big)=>'<span class="stars'+(big?' big':'')+'" role="img" aria-label="'+n+' of 3 stars">'+[0,1,2].map(i=>starSVG(i<n)).join('')+'</span>';
+const starSVG=(on,k)=>'<svg class="'+(on?'on':'')+'" style="--k:'+k+'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z" fill="'+(on?'#f3dd7a':'rgba(0,0,0,.32)')+'" stroke="'+(on?'#a98d1a':'rgba(255,255,255,.18)')+'" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+const starsHTML=(n,big)=>'<span class="stars'+(big?' big':'')+'" role="img" aria-label="'+n+' of 3 stars">'+[0,1,2].map(i=>starSVG(i<n,i)).join('')+'</span>';
 const lockSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
 const atomLogo='<svg width="40" height="40" viewBox="-70 -70 140 140" fill="none" aria-hidden="true"><ellipse rx="64" ry="24" stroke="#7fd1f0" stroke-width="7"/><ellipse rx="64" ry="24" stroke="#f3dd7a" stroke-width="7" transform="rotate(60)"/><ellipse rx="64" ry="24" stroke="#f2a8a3" stroke-width="7" transform="rotate(120)"/><circle cx="0" cy="0" r="14" fill="#fdf6d8"/><circle cx="0" cy="0" r="7" fill="#e0b81a"/></svg>';
 
@@ -530,7 +562,7 @@ function makeQ(it,room){
 }
 
 /* ---------- state ---------- */
-const V={authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
+const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
 const roomPool=(room,deckId)=>deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t)));
@@ -550,7 +582,7 @@ function startRound(roomId){
   }
   V.qs=picks.map(it=>makeQ(it,room)).filter(Boolean);
   if(!V.qs.length)return;
-  Object.assign(V,{screen:'quiz',roomId,qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],ups:[],lastUp:-1,flipped:{},lvBefore:levelInfo(S.xp).lvl});
+  Object.assign(V,{anim:'screen',cardFrom:null,screen:'quiz',roomId,qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],ups:[],lastUp:-1,flipped:{},lvBefore:levelInfo(S.xp).lvl});
   render();window.scrollTo(0,0);
 }
 function answer(i){
@@ -562,6 +594,8 @@ function answer(i){
     V.lastPts=10+Math.min(10,Math.max(0,V.streak-2)*2);V.score+=V.lastPts;
     const before=S.owned[q.item.id]||0;V.lastNew=!before;S.owned[q.item.id]=before+1;V.lastCount=before+1;
     const t0=tierOf(before),t1=tierOf(before+1);V.lastUp=(t0>=0&&t1>t0)?t1:-1;
+    {const bt=nextTier(before),bp=prevAt(before);V.cardFrom=V.lastUp>=0?0:(bt?Math.round((before-bp)/(bt.at-bp)*100):100)}
+    V.fx=V.lastUp>=0?'level':'ok';
     if(V.lastNew)V.newIds.push(q.item.id);
     if(V.lastUp>=0)V.ups.push({id:q.item.id,tier:V.lastUp});
     tone(V.lastUp>=0?'level':'ok');
@@ -574,7 +608,7 @@ function answer(i){
 }
 function next(){
   if(V.pick==null)return;
-  if(V.qi+1<V.qs.length){V.qi++;V.pick=null;render();window.scrollTo(0,0);return}
+  if(V.qi+1<V.qs.length){V.qi++;V.pick=null;V.anim='screen';V.cardFrom=null;render();window.scrollTo(0,0);return}
   const correct=V.res.filter(Boolean).length,ratio=correct/V.qs.length;
   V.perfect=correct===V.qs.length;
   V.stars=ratio>=.9?3:ratio>=.7?2:ratio>=.5?1:0;
@@ -582,14 +616,14 @@ function next(){
   V.lvBefore=levelInfo(S.xp).lvl;S.xp+=V.xpGain;V.lvAfter=levelInfo(S.xp).lvl;
   const k=V.roomId+'|'+V.deckId;S.stars[k]=Math.max(S.stars[k]||0,V.stars);
   S.rounds++;S.best=Math.max(S.best,V.best);save();
-  V.screen='results';tone('win');render();window.scrollTo(0,0);
+  V.screen='results';V.anim='results';V.fx=V.perfect?'perfect':'';tone('win');render();window.scrollTo(0,0);
 }
 
 /* ---------- views ---------- */
 function topHTML(){
   const L=levelInfo(S.xp);const have=ownedCount(ALL);
   return '<header class="top"><button class="logo" data-act="home" aria-label="Back to home">'+atomLogo+'<span><b>ELEMENTAL</b><small>ARCADE</small></span></button>'+
-  '<div class="trainer"><div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+Math.round(L.into/L.need*100)+'%"></i></div></div>'+
+  '<div class="trainer"><div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+(V.xpFrom==null?Math.round(L.into/L.need*100):V.xpFrom)+'%" data-w="'+Math.round(L.into/L.need*100)+'"></i></div></div>'+
   (window.Cloud?'<button class="iconbtn" data-act="account">'+(ACCT?esc(ACCT.nick)+' <b>'+esc(ACCT.cls.toUpperCase())+'</b>':'Sign in')+'</button>':'')+
   '<button class="iconbtn" data-act="binder" aria-label="Open card binder">Binder <b>'+have+'/'+ALL.length+'</b></button>'+
   '<button class="iconbtn" data-act="mute" aria-pressed="'+!!S.mute+'">Sound <b>'+(S.mute?'Off':'On')+'</b></button></div></header>';
@@ -597,9 +631,9 @@ function topHTML(){
 function homeHTML(){
   const deck=DECKS.find(d=>d.id===S.deck);
   const chips=DECKS.map(d=>{const it=deckItems(d.id);return '<button class="deck'+(d.id===S.deck?' on':'')+'" data-act="deck" data-id="'+d.id+'" aria-pressed="'+(d.id===S.deck)+'"><b>'+d.name+'</b><span>'+d.sub+'</span><em>'+ownedCount(it)+'/'+it.length+' cards</em></button>'}).join('');
-  const rooms=ROOMS.map(r=>{
+  const rooms=ROOMS.map((r,ri)=>{
     const n=roomPool(r,S.deck).length;const c=THEMES[r.theme];const st=S.stars[r.id+'|'+S.deck]||0;
-    return '<button class="room" data-act="room" data-id="'+r.id+'"'+(n?'':' disabled')+'><div class="band" style="background:linear-gradient(135deg,'+c.dark+','+c.mid+')"><span class="glyph">'+r.glyph+'</span>'+starsHTML(st)+'</div><div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Not available in this deck.')+'</span></div></button>';
+    return '<button class="room" style="--i:'+ri+'" data-act="room" data-id="'+r.id+'"'+(n?'':' disabled')+'><div class="band" style="background:linear-gradient(135deg,'+c.dark+','+c.mid+')"><span class="glyph">'+r.glyph+'</span>'+starsHTML(st)+'</div><div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Not available in this deck.')+'</span></div></button>';
   }).join('');
   return '<section><div class="sechead"><div><h1 class="h">Pick a deck</h1><p class="sub">Every correct answer wins that card for your binder. Cards you miss come back more often.</p></div></div><div class="decks">'+chips+'</div></section>'+
   '<section class="sec"><div class="sechead"><h2 class="h">Pick a room</h2><span class="sub" style="margin:0">Playing: <b style="color:var(--gold)">'+deck.name+'</b></span></div><div class="rooms">'+rooms+'</div></section>'+
@@ -607,7 +641,7 @@ function homeHTML(){
 }
 function quizHTML(){
   const q=cur();const room=roomOf(V.roomId);const done=V.pick!=null;
-  const pips=V.qs.map((_,i)=>'<i class="pip '+(i<V.qi||(i===V.qi&&done)?(V.res[i]?'ok':'no'):i===V.qi?'cur':'')+'"></i>').join('');
+  const pips=V.qs.map((_,i)=>'<i class="pip '+(i<V.qi||(i===V.qi&&done)?(V.res[i]?'ok':'no'):i===V.qi?'cur':'')+(i===V.qi&&done?' new':'')+'"></i>').join('');
   const opts=q.opts.map((o,i)=>{
     let cls='opt'+(q.mono?' mono':'');
     if(done){if(o.ok)cls+=' right';else if(i===V.pick)cls+=' wrong';else cls+=' dim'}
@@ -618,15 +652,16 @@ function quizHTML(){
     const ok=V.res[V.qi];const last=V.qi+1>=V.qs.length;
     const good=['Nice one!','Correct!','You got it!','Sharp!'][V.qi%4],bad=['Not quite.','Close, study this one.','Missed it.'][V.qi%3];
     const cnt=S.owned[q.item.id]||0,nt=nextTier(cnt),pa=prevAt(cnt);
-    const xp=ok?'<div class="cxp"><div class="bar2" role="img" aria-label="Card XP"><i style="width:'+(nt?Math.round((cnt-pa)/(nt.at-pa)*100):100)+'%"></i></div><span>'+esc(q.item.name)+' card: '+(nt?cnt+' of '+nt.at+' correct to reach '+nt.n:'max level')+'</span></div>':'';
+    const pctNow=nt?Math.round((cnt-pa)/(nt.at-pa)*100):100;
+    const xp=ok?'<div class="cxp"><div class="bar2" role="img" aria-label="Card XP"><i style="width:'+(V.cardFrom==null?pctNow:V.cardFrom)+'%" data-w="'+pctNow+'"></i></div><span>'+esc(q.item.name)+' card: '+(nt?cnt+' of '+nt.at+' correct to reach '+nt.n:'max level')+'</span></div>':'';
     const up=ok&&V.lastUp>=0?'<span class="win up">CARD LEVEL UP: '+TIERS[V.lastUp].n.toUpperCase()+'</span>':'';
     const showCard=!ok||V.lastUp>=0;
     fb='<div class="fb '+(ok?'ok':'no')+'" role="status"><div class="txt"><h3>'+(ok?good:bad)+'</h3>'+q.exp+
       (ok?'<span class="win">+'+V.lastPts+' pts'+(V.lastNew?' · NEW CARD: '+esc(q.item.name):'')+'</span>':'')+up+xp+
       '<button class="btn" data-act="next">'+(last?'See results':'Next')+'</button></div>'+
-      (showCard?'<button class="cardbtn" data-act="open" data-id="'+q.item.id+'" aria-label="Enlarge the '+esc(q.item.name)+' card">'+cardHTML(q.item,Math.min(1,(Math.min(innerWidth,1080)-64)/240),tierShown(q.item.id),true)+'</button>':'')+'</div>';
+      (showCard?'<button class="cardbtn" data-act="open" data-id="'+q.item.id+'" aria-label="Enlarge the '+esc(q.item.name)+' card">'+cardHTML(q.item,Math.min(1,(Math.min(innerWidth,1080)-64)/240),tierShown(q.item.id),true,V.lastUp>=0&&ok?'levelup':'deal')+'</button>':'')+'</div>';
   }
-  return '<div class="hud"><button class="btn ghost small" data-act="home">Quit</button><div class="pips" aria-label="Question '+(V.qi+1)+' of '+V.qs.length+'">'+pips+'</div><div class="hudstat"><span>Score<b>'+V.score+'</b></span>'+(V.streak>=2?'<span>Streak<b>×'+V.streak+'</b></span>':'')+'</div></div>'+
+  return '<div class="hud"><button class="btn ghost small" data-act="home">Quit</button><div class="pips" aria-label="Question '+(V.qi+1)+' of '+V.qs.length+'">'+pips+'</div><div class="hudstat"><span>Score<b>'+V.score+'</b></span>'+(V.streak>=2?'<span'+(V.streak>=3?' class="hot"':'')+'>Streak<b>×'+V.streak+'</b></span>':'')+'</div></div>'+
   '<section class="panel"><div class="qmeta">'+room.name+' · '+DECKS.find(d=>d.id===V.deckId).name+' · '+(V.qi+1)+' of '+V.qs.length+'</div><h2 class="prompt">'+q.prompt+'</h2><div class="clue">'+q.clue+'</div><div class="opts">'+opts+'</div>'+fb+'</section>';
 }
 function resultsHTML(){
@@ -636,14 +671,14 @@ function resultsHTML(){
   const pw=Math.max(150,Math.min(240,Math.floor((Math.min(innerWidth,1080)-32-16)/2)));
   const pack=V.newIds.length?
     '<section><div class="sechead"><h2 class="h">New cards won</h2><div class="actions"><button class="btn small" data-act="flipall">Flip all</button></div></div><div class="pack" style="--pw:'+pw+'px">'+
-    V.newIds.map(id=>{const it=BY[id];const s=pw/240;return '<button class="flip'+(V.flipped[id]?' on':'')+'" data-act="flip" data-id="'+id+'" style="width:'+pw+'px;height:'+Math.round(336*s)+'px" aria-label="Flip card"><div class="flip-in"><div class="face back">'+'<div class="cw" style="--cs:'+s+'">'+backInner()+'</div></div><div class="face front">'+cardHTML(it,s,tierShown(id))+'</div></div></button>'}).join('')+'</div></section>':
+    V.newIds.map((id,ni)=>{const it=BY[id];const s=pw/240;return '<button class="flip'+(V.flipped[id]?' on':'')+'" data-act="flip" data-id="'+id+'" style="--i:'+ni+';width:'+pw+'px;height:'+Math.round(336*s)+'px" aria-label="Flip card"><div class="flip-in"><div class="face back">'+'<div class="cw" style="--cs:'+s+'">'+backInner()+'</div></div><div class="face front">'+cardHTML(it,s,tierShown(id))+'</div></div></button>'}).join('')+'</div></section>':
     '<p class="sub">No new cards this round. Try another room or deck to find more.</p>';
   const upm={};V.ups.forEach(u=>{upm[u.id]=Math.max(upm[u.id]||0,u.tier)});
   const upids=Object.keys(upm);
-  const upsec=upids.length?'<section><div class="sechead"><h2 class="h">Cards that leveled up</h2></div><div class="ups" style="--pw:'+pw+'px">'+upids.map(id=>{const it=BY[id];const s=pw/240;return '<div class="cell"><button class="cardbtn" data-act="open" data-id="'+id+'" aria-label="'+esc(it.name)+'">'+cardHTML(it,s,upm[id],true)+'</button><span class="tcap">'+TIERS[upm[id]].n+'</span></div>'}).join('')+'</div></section>':'';
+  const upsec=upids.length?'<section><div class="sechead"><h2 class="h">Cards that leveled up</h2></div><div class="ups" style="--pw:'+pw+'px">'+upids.map(id=>{const it=BY[id];const s=pw/240;return '<div class="cell"><button class="cardbtn" data-act="open" data-id="'+id+'" aria-label="'+esc(it.name)+'">'+cardHTML(it,s,upm[id],true,'levelup')+'</button><span class="tcap">'+TIERS[upm[id]].n+'</span></div>'}).join('')+'</div></section>':'';
   const missed=V.missed.length?'<section><h2 class="h" style="font-size:22px">Review these</h2><p class="sub">Tap a name to see its card.</p><div class="chips" style="margin-top:10px">'+V.missed.map(id=>'<button class="chip" data-act="open" data-id="'+id+'">'+esc(BY[id].name)+'</button>').join('')+'</div></section>':'';
   return '<div class="res"><section class="panel"><div class="qmeta">'+roomOf(V.roomId).name+' · '+DECKS.find(d=>d.id===V.deckId).name+'</div><h1 class="prompt" style="margin-bottom:10px">'+title+'</h1>'+starsHTML(V.stars,true)+
-  '<div class="stats" style="margin-top:16px"><div class="stat"><span>Correct</span><b>'+correct+'/'+V.qs.length+'</b></div><div class="stat"><span>Score</span><b>'+V.score+'</b></div><div class="stat"><span>XP earned</span><b>+'+V.xpGain+'</b></div><div class="stat"><span>Best streak</span><b>×'+V.best+'</b></div></div>'+
+  '<div class="stats" style="margin-top:16px"><div class="stat"><span>Correct</span><b data-count="'+correct+'" data-post="/'+V.qs.length+'">'+correct+'/'+V.qs.length+'</b></div><div class="stat"><span>Score</span><b data-count="'+V.score+'">'+V.score+'</b></div><div class="stat"><span>XP earned</span><b data-count="'+V.xpGain+'" data-pre="+">+'+V.xpGain+'</b></div><div class="stat"><span>Best streak</span><b data-count="'+V.best+'" data-pre="×">×'+V.best+'</b></div></div>'+
   (V.perfect?'<p class="sub" style="margin-top:12px">Perfect round bonus: +20 XP.</p>':'')+'</section>'+lv+upsec+pack+missed+
   '<div class="actions"><button class="btn" data-act="again">Play again</button><button class="btn ghost" data-act="home">Pick a room</button><button class="btn ghost" data-act="binder">Open binder</button></div></div>';
 }
@@ -652,9 +687,9 @@ function binderHTML(){
   const cur=tabs.find(t=>t[0]===V.tab)||tabs[0];
   const have=ownedCount(ALL);
   const tabHTML=tabs.map(t=>'<button class="tab'+(t[0]===V.tab?' on':'')+'" data-act="tab" data-id="'+t[0]+'">'+t[1]+' <em>'+ownedCount(t[2])+'/'+t[2].length+'</em></button>').join('');
-  const cells=cur[2].map(it=>{
-    if(S.owned[it.id]){const t=tierShown(it.id);return '<div class="cell"><button class="cardbtn" data-act="open" data-id="'+it.id+'" aria-label="'+esc(it.name)+', '+TIERS[t].n+'">'+cardHTML(it,.4583,t)+'</button><span class="tcap">'+TIERS[t].n+'<em>'+'●'.repeat(t+1)+'<u>'+'●'.repeat(4-t)+'</u></em></span></div>'}
-    return '<div class="slot" aria-label="Locked card"><b>'+(it.cat==='el'?it.zn:'#'+it.id.replace(/\D/g,''))+'</b>'+lockSVG+'<span>LOCKED</span></div>';
+  const cells=cur[2].map((it,ci)=>{const ix='style="--i:'+Math.min(ci,36)+'"';
+    if(S.owned[it.id]){const t=tierShown(it.id);return '<div class="cell" '+ix+'><button class="cardbtn" data-act="open" data-id="'+it.id+'" aria-label="'+esc(it.name)+', '+TIERS[t].n+'">'+cardHTML(it,.4583,t)+'</button><span class="tcap">'+TIERS[t].n+'<em>'+'●'.repeat(t+1)+'<u>'+'●'.repeat(4-t)+'</u></em></span></div>'}
+    return '<div class="slot" '+ix+' aria-label="Locked card"><b>'+(it.cat==='el'?it.zn:'#'+it.id.replace(/\D/g,''))+'</b>'+lockSVG+'<span>LOCKED</span></div>';
   }).join('');
   return '<div class="sechead"><div><h1 class="h">Card binder</h1><div class="bar" role="img" aria-label="'+have+' of '+ALL.length+' cards"><i style="width:'+Math.round(have/ALL.length*100)+'%"></i></div><p class="sub">'+have+' of '+ALL.length+' cards collected. Tap a card to enlarge it.</p></div><button class="btn ghost small" data-act="home">Back to rooms</button></div>'+
   '<div class="tabs" role="tablist" style="margin-bottom:18px">'+tabHTML+'</div><div class="grid">'+cells+'</div>';
@@ -689,8 +724,43 @@ function accountHTML(){
 }
 function render(){
   const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():V.screen==='account'?accountHTML():binderHTML();
-  app.innerHTML=topHTML()+'<main>'+body+'</main>'+(V.modal?modalHTML():'');
+  app.innerHTML=topHTML()+'<main'+(V.anim?' class="enter"':'')+'>'+body+'</main>'+(V.modal?modalHTML():'');
   if(V.screen==='quiz'&&V.pick!=null){const nb=app.querySelector('[data-act="next"]');if(nb)nb.focus()}
+  afterRender();
+}
+const RM=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
+function afterRender(){
+  const fx=V.fx,an=V.anim;V.fx='';V.anim='';
+  app.querySelectorAll('[data-w]').forEach(el=>{requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.width=el.dataset.w+'%'}))});
+  const xi=app.querySelector('.xp i[data-w]');if(xi)V.xpFrom=+xi.dataset.w;
+  if(an==='results')countUps();
+  if(fx)requestAnimationFrame(()=>doFx(fx));
+}
+function countUps(){
+  if(RM.matches)return;
+  app.querySelectorAll('[data-count]').forEach(el=>{
+    const v=+el.dataset.count,pre=el.dataset.pre||'',post=el.dataset.post||'',t0=performance.now();
+    const step=t=>{const k=Math.min(1,(t-t0)/800),e=1-Math.pow(1-k,3);el.textContent=pre+Math.round(v*e)+post;if(k<1)requestAnimationFrame(step)};
+    requestAnimationFrame(step);
+  });
+}
+function burst(cx,cy,n,spread,colors){
+  for(let i=0;i<n;i++){
+    const d=document.createElement('i'),sz=5+Math.random()*6;
+    d.style.cssText='position:fixed;left:'+cx+'px;top:'+cy+'px;width:'+sz+'px;height:'+(sz*(Math.random()<.5?1:.5))+'px;background:'+colors[i%colors.length]+';border-radius:2px;pointer-events:none;z-index:60';
+    document.body.appendChild(d);
+    const a=Math.random()*Math.PI*2,v=spread*(.4+Math.random()*.8),dx=Math.cos(a)*v,dy=Math.sin(a)*v-spread*.35;
+    const an=d.animate([{transform:'translate(-50%,-50%) rotate(0deg)',opacity:1},{transform:'translate('+dx+'px,'+(dy+spread*.7)+'px) rotate('+(Math.random()*720-360)+'deg)',opacity:0}],{duration:750+Math.random()*500,easing:'cubic-bezier(.15,.7,.3,1)'});
+    an.onfinish=()=>d.remove();
+  }
+}
+function doFx(kind){
+  if(RM.matches)return;
+  const cols=['#f3dd7a','#7fd1f0','#f2a8a3','#fdf6d8','#4caf62'];
+  const mid=el=>{const r=el.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]};
+  if(kind==='ok'){const el=app.querySelector('.opt.right');if(el){const [x,y]=mid(el);burst(x,y,14,90,cols)}}
+  else if(kind==='level'){const el=app.querySelector('.fb .cw')||app.querySelector('.opt.right');if(el){const [x,y]=mid(el);burst(x,y,44,240,cols.concat(['#ff5ab4','#47ffbe','#ffffff']))}}
+  else if(kind==='perfect'){burst(innerWidth/2,Math.min(200,innerHeight/3),64,300,cols.concat(['#ff5ab4','#47ffbe']))}
 }
 
 /* ---------- events ---------- */
@@ -704,10 +774,10 @@ app.addEventListener('click',e=>{
   else if(a==='room')startRound(id);
   else if(a==='answer')answer(+t.dataset.i);
   else if(a==='next')next();
-  else if(a==='home'){V.screen='home';V.modal=null;render();window.scrollTo(0,0)}
-  else if(a==='binder'){V.screen='binder';V.modal=null;render();window.scrollTo(0,0)}
-  else if(a==='tab'){V.tab=id;render()}
-  else if(a==='account'){V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='home'){V.anim='screen';V.screen='home';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='binder'){V.anim='screen';V.screen='binder';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='tab'){V.tab=id;V.anim='screen';render()}
+  else if(a==='account'){V.anim='screen';V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='authtab'){V.authTab=id;V.authErr='';render()}
   else if(a==='signout'){Cloud.signOut()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
