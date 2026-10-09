@@ -426,6 +426,7 @@ const ROOMS=[
   {id:'lab',name:'Particle Lab',glyph:'p n e',desc:'Count neutrons, electrons and atoms.',theme:'Nonmetal',types:['lab']},
   {id:'ion',name:'Ion Maker',glyph:'Na⁺',desc:'Valence electrons and the ion each element forms.',theme:'Cation',types:['ion']},
   {id:'metal',name:'Metal Detector',glyph:'M/N',desc:'Find the metal, nonmetal or metalloid.',theme:'Post-Transition',types:['metal']},
+  {id:'review',name:'Review Room',glyph:'Rev',desc:'Replay the cards you missed. Get them right to clear them.',theme:'Actinide',types:['review'],solo:true},
   {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','shells','config','table','type','lab']}
 ];
 /* Why a room can be empty in a deck, and decks that fill it (shown when a locked room is tapped). */
@@ -812,6 +813,14 @@ const GEN={
     return{prompt:'Which one is a '+cls+'?',clue:'',opts,
       exp:'<p><b>'+esc(it.name)+'</b> is a <b>'+cls+'</b> ('+esc(it.family.toLowerCase())+').</p>'};
   },
+  /* Review Room: a missed card in any question type it supports. The only generator that reads S (through supports), so solo only. */
+  review(it){
+    const ts=['ability','symbol','number','config','table','type','lab'].filter(t=>supports(it,t));
+    if(!ts.length)return null;
+    const k=rnd(ts.length);
+    for(let i=0;i<ts.length;i++){let q=null;try{q=GEN[ts[(k+i)%ts.length]](it)}catch(e){q=null}if(q)return q}
+    return null;
+  }
 };
 /* Electrons per shell as numbers, or null (polyatomic ions have no shells; H+ has no electrons). */
 const shellsOf=it=>{const a=String(it.shells||'').split(',').map(s=>parseInt(s,10));return a.length&&a.every(n=>n>=0)&&a.some(n=>n>0)?a:null};
@@ -823,6 +832,7 @@ function supports(it,t){
     case 'lab':return it.cat!=='el';
     case 'ion':return it.cat==='el'&&ION_CHG.hasOwnProperty(it.sym);
     case 'metal':return it.cat==='el'&&!!klass(it);
+    case 'review':return (S.miss[it.id]||0)>0;   // reads S: solo only, never built for VS
     default:return true;
   }
 }
@@ -838,6 +848,7 @@ function makeQ(it,room,rng){
    Samples without replacement; repeats a card only when the pool has fewer than 10. */
 function buildRound(deckId,roomId,seed){
   const room=roomOf(roomId);const rng=mulberry32(seed);
+  if(room.solo)return [];   // Review Room reads S.miss: never part of a shared seeded round
   const prevDeck=QDECK;QDECK=deckId;
   try{
     const pool=roomPool(room,deckId);if(!pool.length)return [];
@@ -858,13 +869,16 @@ const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBus
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
 const roomPool=(room,deckId)=>deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t)));
+/* How many cards a room can use in a deck; the Review Room stays locked until at least 3 cards have been missed. */
+const roomN=(room,deckId)=>{const n=roomPool(room,deckId).length;return room.id==='review'&&n<3?0:n};
 
 function startRound(roomId){
   const room=roomOf(roomId);const pool=roomPool(room,S.deck);
-  if(!pool.length)return;
+  if(!roomN(room,S.deck))return;
   V.deckId=S.deck;
-  const n=Math.min(10,Math.max(5,pool.length));
+  const n=roomId==='review'?Math.min(10,pool.length):Math.min(10,Math.max(5,pool.length));
   const picks=[];let bag=pool.slice();
+  if(roomId==='review')picks.push(...pool.slice().sort((a,b)=>S.miss[b.id]-S.miss[a.id]).slice(0,n));   // most-missed first
   while(picks.length<n){
     if(!bag.length)bag=pool.slice();
     const w=bag.map(it=>!S.owned[it.id]?3:(S.miss[it.id]?2:1));
@@ -888,6 +902,7 @@ function answer(i){
     const t0=tierOf(before),t1=tierOf(before+1);V.lastUp=(t0>=0&&t1>t0)?t1:-1;
     {const bt=nextTier(before),bp=prevAt(before);V.cardFrom=V.lastUp>=0?0:(bt?Math.round((before-bp)/(bt.at-bp)*100):100)}
     V.fx=V.lastUp>=0?'level':'ok';
+    if(V.roomId==='review'&&S.miss[q.item.id]){S.miss[q.item.id]--;if(S.miss[q.item.id]<=0)delete S.miss[q.item.id]}   // Review Room: each right answer clears one miss
     if(V.lastNew)V.newIds.push(q.item.id);
     if(V.lastUp>=0)V.ups.push({id:q.item.id,tier:V.lastUp});
     tone(V.lastUp>=0?'level':'ok');
@@ -944,20 +959,20 @@ function vsHTML(){
   return '';
 }
 /* The room Play now uses: the remembered one if this deck can fill it, else Mixed Pack. */
-const playRoom=()=>{const r=roomOf(S.room);return r&&roomPool(r,S.deck).length?r:roomOf('mixed')};
-const lockedMsg=r=>{const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
+const playRoom=()=>{const r=roomOf(S.room);return r&&roomN(r,S.deck)?r:roomOf('mixed')};
+const lockedMsg=r=>{if(r.id==='review')return 'No misses yet. Nice.';const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
 let HOMESEEN=false;
 function homeHTML(){
   const deck=DECKS.find(d=>d.id===S.deck);const pr=playRoom();
   const chips=DECKS.map(d=>{const it=deckItems(d.id);return '<button class="deck'+(d.id===S.deck?' on':'')+'" data-act="deck" data-id="'+d.id+'" aria-pressed="'+(d.id===S.deck)+'"><b>'+d.name+'</b><span>'+d.sub+'</span><em>'+ownedCount(it)+'/'+it.length+' cards</em></button>'}).join('');
-  const list=ROOMS.map(r=>({r,n:roomPool(r,S.deck).length}));
+  const list=ROOMS.map(r=>({r,n:roomN(r,S.deck)}));
   const rooms=list.filter(x=>x.n).concat(list.filter(x=>!x.n)).map(({r,n},ri)=>{
     const c=THEMES[r.theme];const st=S.stars[r.id+'|'+S.deck]||0;const mixed=r.id==='mixed';
     const band=mixed?'linear-gradient(135deg,var(--goldd),var(--gold))':'linear-gradient(135deg,'+c.dark+','+c.mid+')';
     const need=ROOM_NEEDS[r.id];
     return '<button class="room'+(mixed?' mixed':'')+'" style="--i:'+ri+'" data-act="room" data-id="'+r.id+'"'+(n?'':' aria-disabled="true"')+'>'+
       '<div class="band"'+(n?' style="background:'+band+'"':'')+'><span class="glyph">'+(n?r.glyph:lockSVG)+'</span>'+(n?starsHTML(st):'')+'</div>'+
-      '<div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Locked: needs '+(need?need.needs:'other cards')+'.')+'</span></div></button>';
+      '<div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Locked: needs '+(need?need.needs:r.id==='review'?'3 missed cards':'other cards')+'.')+'</span></div></button>';
   }).join('');
   const stag=!HOMESEEN;HOMESEEN=true;
   return noticeHTML()+vsHTML()+
@@ -1242,7 +1257,7 @@ render();
 </script>
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
-<script type="module" src="cloud.js?v=3"></script>
-<script type="module" src="vs.js?v=3"></script>
+<script type="module" src="cloud.js?v=4"></script>
+<script type="module" src="vs.js?v=4"></script>
 </body>
 </html>
