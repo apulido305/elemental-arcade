@@ -807,7 +807,9 @@ const GEN={
   /* Metal Detector: 4 options, the answer is the card; decoys come from the other two classes, nearest in Z first. */
   metal(it){
     const cls=klass(it);if(!cls)return null;
-    const pool=dpool(it).filter(x=>x.id!==it.id&&klass(x)&&klass(x)!==cls);
+    const other=x=>x.id!==it.id&&klass(x)&&klass(x)!==cls;
+    const inDeck=dpool(it).filter(other);   // decks with few other-class cards (Row 6, Row 7) borrow decoys from all elements
+    const pool=inDeck.length>=3?inDeck:inDeck.concat(ALL.filter(x=>other(x)&&!inDeck.includes(x)));
     const keys=pool.map(x=>[Math.abs(x.zn-it.zn)+rand()*6,x]).sort((a,b)=>a[0]-b[0]);
     const opts=mkOpts(esc(it.name),keys.map(p=>esc(p[1].name)));if(!opts||opts.length<4)return null;
     return{prompt:'Which one is a '+cls+'?',clue:'',opts,
@@ -960,7 +962,7 @@ function vsHTML(){
 }
 /* The room Play now uses: the remembered one if this deck can fill it, else Mixed Pack. */
 const playRoom=()=>{const r=roomOf(S.room);return r&&roomN(r,S.deck)?r:roomOf('mixed')};
-const lockedMsg=r=>{if(r.id==='review')return 'No misses yet. Nice.';const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
+const lockedMsg=r=>{if(r.id==='review')return roomPool(r,S.deck).length?'The Review Room opens when you have missed 3 cards.':'No misses yet. Nice.';const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
 let HOMESEEN=false;
 function homeHTML(){
   const deck=DECKS.find(d=>d.id===S.deck);const pr=playRoom();
@@ -1164,7 +1166,7 @@ app.addEventListener('click',e=>{
   else if(a==='signout'){Cloud.signOut()}
   else if(a==='vs'){if(window.VSArena)window.VSArena.open()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
-  else if(a==='again')startRound(V.roomId);
+  else if(a==='again'){const r=roomOf(V.roomId);if(r&&!roomN(r,S.deck)){V.roomMsg=lockedMsg(r);V.anim='screen';V.screen='home';V.modal=null;render();window.scrollTo(0,0)}else startRound(V.roomId)}   // a Review round can clear its own pool
   else if(a==='open'){V.modal=id;render()}
   else if(a==='flip'){V.flipped[id]=!V.flipped[id];tone('flip');t.classList.toggle('on',!!V.flipped[id])}
   else if(a==='flipall'){V.newIds.forEach(i=>V.flipped[i]=true);tone('flip');app.querySelectorAll('.flip').forEach(b=>b.classList.add('on'))}

@@ -215,3 +215,42 @@ test.describe('Review Room (solo only)', () => {
     expect(dev.errors).toEqual([]);
   });
 });
+
+test('R1/R10: every deck that unlocks Ion Maker or Metal Detector gives a full 10-question round (Row 6 and Row 7 included)', async ({ arena }) => {
+  const dev = await arena.device({ firebase: 'blocked' });
+  await dev.goto('/');
+  const out = await dev.page.evaluate(() => {
+    const res = [];
+    for (const room of ['ion', 'metal']) for (const d of ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'all']) {
+      const pool = roomPool(roomOf(room), d).length;
+      if (!pool) { res.push({ room, d, pool, min: 0, max: 0 }); continue; }
+      const lens = []; for (let s = 1; s <= 40; s++) lens.push(buildRound(d, room, s).length);
+      res.push({ room, d, pool, min: Math.min(...lens), max: Math.max(...lens) });
+    }
+    return res;
+  });
+  for (const o of out) if (o.pool) expect(o.min, `${o.room}/${o.d} always builds 10 questions`).toBe(10);
+  expect(out.find(o => o.room === 'metal' && o.d === 'r7').pool).toBeGreaterThan(0);   // Row 7 is all metal: decoys must come from all elements
+  expect(out.find(o => o.room === 'ion' && o.d === 'r7').pool).toBe(0);                // no common-ion element in Row 7: locked, not empty-but-open
+});
+
+test('R5: Play again after a Review round that clears the pool goes home with a message instead of doing nothing; 1 or 2 misses say how many are needed', async ({ arena }) => {
+  const dev = await arena.device({ firebase: 'blocked' }), p = dev.page;
+  await dev.goto('/');
+  const ids = await p.evaluate(() => deckItems(S.deck).slice(0, 3).map(x => x.id));
+  await p.evaluate(ids => { S.miss = { [ids[0]]: 1 }; save(); render(); }, ids);
+  await p.locator('[data-act="room"][data-id="review"]').click({ force: true });
+  await expect(p.locator('[data-ui="room-status"]')).toHaveText('The Review Room opens when you have missed 3 cards.');
+  await p.evaluate(ids => { S.miss = { [ids[0]]: 1, [ids[1]]: 1, [ids[2]]: 1 }; save(); render(); }, ids);
+  await p.locator('[data-act="room"][data-id="review"]').click();
+  expect(await p.evaluate(() => V.screen)).toBe('quiz');
+  for (let i = 0; i < 3; i++) {
+    await p.evaluate(() => answer(V.qs[V.qi].opts.findIndex(o => o.ok)));
+    await p.evaluate(() => next());
+  }
+  expect(await p.evaluate(() => V.screen)).toBe('results');
+  expect(await p.evaluate(() => Object.keys(S.miss).length)).toBe(0);
+  await p.locator('[data-act="again"]').click();
+  expect(await p.evaluate(() => V.screen)).toBe('home');
+  await expect(p.locator('[data-ui="room-status"]')).toHaveText('No misses yet. Nice.');
+});
