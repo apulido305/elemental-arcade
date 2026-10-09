@@ -19,10 +19,12 @@ service cloud.firestore {
 
     function answerPath(code, uid, q) { return /databases/$(database)/documents/matches/$(code)/answers/$(uid + '_' + string(q)); }
 
-    // Match clock (must match vs.js): question 0 appears 5 s after startAt, each question is 15 s plus a 2.5 s reveal,
-    // so ten questions end 180 s after startAt. Devices are assumed NTP-synced within a couple of seconds.
+    // Match clock (must match vs.js): question 0 appears 5 s after startAt, each question is 15 s plus a 2.5 s reveal.
+    // qn is the round length (10, 15 or 20; a match without the field is 10), so ten questions end 180 s after startAt.
+    // Devices are assumed NTP-synced within a couple of seconds.
+    function qn(m) { return m.get('qn', 10); }
     function qOpensAt(m, q) { return m.startAt + duration.value(5000 + q * 17500, 'ms'); }
-    function clockOver(m) { return request.time > m.startAt + duration.value(178000, 'ms'); }
+    function clockOver(m) { return request.time > m.startAt + duration.value(3000 + qn(m) * 17500, 'ms'); }
 
     function codeOk(code) { return code.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$'); }
 
@@ -72,7 +74,7 @@ service cloud.firestore {
         && codeOk(code)
         && request.resource.data.keys().hasOnly(['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests',
              'listed', 'status', 'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil',
-             'winnerUid', 'endedAt', 'rematch'])
+             'winnerUid', 'endedAt', 'rematch', 'qn'])
         && request.resource.data.keys().hasAll(['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests',
              'listed', 'status', 'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil',
              'winnerUid', 'endedAt', 'rematch'])
@@ -83,6 +85,7 @@ service cloud.firestore {
         && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed']
         && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
         && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
+        && qn(request.resource.data) in [10, 15, 20]
         && request.resource.data.allowGuests is bool
         && request.resource.data.listed is bool
         && request.resource.data.status == 'lobby'
@@ -113,12 +116,13 @@ service cloud.firestore {
             && request.auth.uid == resource.data.hostUid
             && resource.data.status == 'lobby'
             && request.resource.data.status == 'lobby'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deck', 'room', 'seed', 'cap', 'allowGuests', 'listed'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deck', 'room', 'seed', 'qn', 'cap', 'allowGuests', 'listed'])
             && request.resource.data.deck in ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all']
             && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed']
             && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
             && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
             && request.resource.data.cap >= resource.data.playerCount
+            && qn(request.resource.data) in [10, 15, 20]
             && request.resource.data.allowGuests is bool
             && request.resource.data.listed is bool)
 
@@ -149,7 +153,7 @@ service cloud.firestore {
             && (request.resource.data.status == 'playing'
                 || request.resource.data.status == 'abandoned'
                 || (request.resource.data.status == 'done' && resource.data.winnerUid == null))
-            // Before the ten questions are over, only an account (the aggregator, on a forfeit or when
+            // Before the last question is over, only an account (the aggregator, on a forfeit or when
             // everyone left) may end the match. A guest cannot cut a match short.
             && (request.resource.data.status == 'playing' || isAccount() || clockOver(resource.data))
             && (request.resource.data.status != 'done' || 'winnerUid' in request.resource.data.diff(resource.data).affectedKeys())
@@ -239,7 +243,7 @@ service cloud.firestore {
         // Update.
         allow update: if
           // Your own row: anything except identity fields. answeredQ only goes up. Score only grows, by at
-          // most one answer's worth per write, and stays within the maximum for ten questions.
+          // most one answer's worth per write, and stays within the maximum for the match's qn questions.
           // Only you can change your own icon, and only to a preset id.
           (signedIn()
             && request.auth.uid == uid
@@ -249,7 +253,7 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'score', 'correct', 'totalMs',
                  'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
             && request.resource.data.answeredQ >= resource.data.answeredQ
-            && request.resource.data.answeredQ <= 9
+            && request.resource.data.answeredQ <= qn(get(matchPath(code)).data) - 1
             // Once marked abandoned, you stay abandoned (no rejoining that match).
             && !(resource.data.abandoned == true && request.resource.data.abandoned != true)
             // Score, correct, totalMs and answeredQ move only together with a brand-new answer doc written in the
@@ -263,14 +267,15 @@ service cloud.firestore {
                     && request.resource.data.totalMs == resource.data.totalMs + getAfter(answerPath(code, uid, request.resource.data.answeredQ)).data.elapsedMs))
             && request.resource.data.score >= resource.data.score
             && request.resource.data.score - resource.data.score <= 150
-            && request.resource.data.score <= 1500
+            && request.resource.data.score <= 150 * qn(get(matchPath(code)).data)
             && request.resource.data.correct >= resource.data.correct
-            && request.resource.data.correct <= 10
+            && request.resource.data.correct <= qn(get(matchPath(code)).data)
             && request.resource.data.totalMs >= resource.data.totalMs
-            && request.resource.data.streak >= 0 && request.resource.data.streak <= 10
+            && request.resource.data.streak >= 0 && request.resource.data.streak <= qn(get(matchPath(code)).data)
             && (request.resource.data.reaction == null
                 || request.resource.data.reaction in ['nice', 'hmm', 'fire', 'gg', 'oops'])
-            && (get(matchPath(code)).data.status in ['lobby', 'playing']
+            // 'done' still takes a slow phone's last answer: the answer doc's time window below is what limits it.
+            && (get(matchPath(code)).data.status in ['lobby', 'playing', 'done']
                 || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'reaction', 'reactionAt', 'left'])))
           ||
           // Someone else's row: the aggregator may only mark a stale player abandoned, while the match is playing.
@@ -296,11 +301,14 @@ service cloud.firestore {
       match /answers/{aid} {
         allow read: if signedIn() && aid.split('_')[0] == request.auth.uid;
 
+        // 'done' only for the last question: after a clock finish it is the one answer that can still be in flight
+        // (earlier questions' late windows close before the match ends). Nothing after an early forfeit.
         allow create: if isParticipant(code)
-          && get(matchPath(code)).data.status == 'playing'
+          && (get(matchPath(code)).data.status == 'playing'
+              || (get(matchPath(code)).data.status == 'done' && request.resource.data.q == qn(get(matchPath(code)).data) - 1))
           && request.resource.data.keys().hasOnly(['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'])
           && request.resource.data.keys().hasAll(['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'])
-          && request.resource.data.q is int && request.resource.data.q >= 0 && request.resource.data.q <= 9
+          && request.resource.data.q is int && request.resource.data.q >= 0 && request.resource.data.q <= qn(get(matchPath(code)).data) - 1
           && aid == request.auth.uid + '_' + string(request.resource.data.q)
           && request.resource.data.choice is int && request.resource.data.choice >= 0 && request.resource.data.choice <= 3
           && request.resource.data.elapsedMs is number && request.resource.data.elapsedMs >= 0
@@ -310,10 +318,11 @@ service cloud.firestore {
           && getAfter(seatPath(code, request.auth.uid)).data.answeredQ == request.resource.data.q
           && get(seatPath(code, request.auth.uid)).data.abandoned != true
           && request.resource.data.elapsedMs <= 15000
-          // Only while that question is on screen (2 s grace each side for clock drift): no answering ahead,
-          // and no answering after the reveal has shown the right option.
+          // Arrival window: from 2 s before the question opens (clock drift) to 8 s after it closes (vs.js LATE_BASE).
+          // The client only lets you answer while the question is on screen; the 8 s is for a slow connection
+          // delivering that answer late, which also covers the last question after the match flips to done.
           && request.time >= qOpensAt(get(matchPath(code)).data, request.resource.data.q) - duration.value(2000, 'ms')
-          && request.time <= qOpensAt(get(matchPath(code)).data, request.resource.data.q) + duration.value(17000, 'ms');
+          && request.time <= qOpensAt(get(matchPath(code)).data, request.resource.data.q) + duration.value(23000, 'ms');
 
         allow update, delete: if false;
       }

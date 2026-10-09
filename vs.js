@@ -3,14 +3,20 @@
 // so solo play in index.html is untouched. If Cloud / Cloud.fb is missing this file does nothing and throws nothing.
 //
 // Clock: the host writes serverTimestamp() to matches/{code}.startAt. Every client derives the same schedule
-// from it (LEAD_MS lead-in, then 10 x [15 s question + 2.5 s reveal]). No server advances anything. Device clocks
+// from it (LEAD_MS lead-in, then qn x [15 s question + 2.5 s reveal], qn = 10, 15 or 20). No server advances anything. Device clocks
 // are assumed to be NTP-synced within a second or two (school devices normally are); that is the only trust.
 // Each client scores its own answer from the moment the question appeared on its own screen.
 //
 // window.VS_TIME_SCALE (TEST ONLY, default 1) multiplies every VS duration so automated tests can run fast.
 
 const Q_BASE = 15000, REVEAL_BASE = 2500, LEAD_BASE = 5000, SPLASH_BASE = 2000;
-const N_Q = 10, BEAT_BASE = 15000, STALE_BASE = 20000, AGG_BASE = 30000, LOBBY_BASE = 5 * 60 * 1000;
+// QN_OK: round lengths a host can pick (stored as matches/{code}.qn; a match without qn is 10 questions).
+// LATE_BASE: how long after a question closes its answer may still reach the server (slow phones). firestore.rules
+// accepts an answer until qOpensAt + 15 s + this; keep the two in step.
+// STALE_BASE: silence before the aggregator may mark a player abandoned. Generous on purpose: a slow phone's
+// heartbeats arrive late, and abandoned is permanent (every later answer is refused).
+const QN_DEF = 10, QN_OK = [10, 15, 20], LATE_BASE = 8000;
+const BEAT_BASE = 15000, STALE_BASE = 45000, AGG_BASE = 30000, LOBBY_BASE = 5 * 60 * 1000;
 const REACT_GAP_BASE = 3000, REACT_SHOW_BASE = 4000;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
@@ -20,18 +26,19 @@ const ELS = ['Boron', 'Neon', 'Cobalt', 'Argon', 'Helium', 'Carbon', 'Xenon', 'C
 
 const TS = () => { const v = Number(window.VS_TIME_SCALE); return v > 0 ? v : 1; };
 const Q_MS = () => Q_BASE * TS(), REVEAL_MS = () => REVEAL_BASE * TS(), SLOT = () => Q_MS() + REVEAL_MS();
-const LEAD_MS = () => LEAD_BASE * TS(), SPLASH_MS = () => SPLASH_BASE * TS();
+const LEAD_MS = () => LEAD_BASE * TS(), SPLASH_MS = () => SPLASH_BASE * TS(), LATE_MS = () => LATE_BASE * TS();
+const qnOk = n => QN_OK.includes(n) ? n : QN_DEF;
 
 /* ---------- pure helpers (exported for tests) ---------- */
 const toMs = v => v == null ? 0 : typeof v === 'number' ? v : typeof v.toMillis === 'function' ? v.toMillis() : (v.seconds != null ? v.seconds * 1000 : 0);
 
-// phaseAt(now, start): start is the moment question 0 appears (startAt + LEAD_MS).
-function phaseAt(nowMs, startMs) {
+// phaseAt(now, start, n): start is the moment question 0 appears (startAt + LEAD_MS); n questions (default 10).
+function phaseAt(nowMs, startMs, n = QN_DEF) {
   const slot = SLOT(), q = Q_MS();
   const elapsed = Math.max(0, nowMs - startMs);
-  const index = Math.min(N_Q - 1, Math.floor(elapsed / slot));
+  const index = Math.min(n - 1, Math.floor(elapsed / slot));
   const into = elapsed - index * slot;
-  if (elapsed >= N_Q * slot) return { name: 'done', index: N_Q - 1 };
+  if (elapsed >= n * slot) return { name: 'done', index: n - 1 };
   if (into < q) return { name: 'question', index, left: q - into };
   return { name: 'reveal', index, left: slot - into };
 }
@@ -66,7 +73,7 @@ const MSG = {
 };
 
 /* ---------- module state ---------- */
-let ui = { open: false, err: '', form: { code: '', deck: null, room: 'mixed', cap: 20, allowGuests: true, listed: true }, guestName: randName(), busy: false, joining: false, lobby: [], ladderOpen: false, copied: false, iconOpen: false, iconSel: null };
+let ui = { open: false, err: '', form: { code: '', deck: null, room: 'mixed', qn: QN_DEF, cap: 20, allowGuests: true, listed: true }, guestName: randName(), busy: false, joining: false, lobby: [], ladderOpen: false, copied: false, iconOpen: false, iconSel: null };
 let R = null;                 // the room we are attached to, or null
 let root = null, unsubLobby = null, wired = false, savedInert = false;
 let C = null, fb = null, Arc = null;
@@ -315,9 +322,10 @@ function menuHTML() {
   const decks = Arc.DECKS.map(d => '<option value="' + d.id + '"' + (d.id === f.deck ? ' selected' : '') + '>' + esc(d.name) + ' (' + esc(d.sub) + ')</option>').join('');
   const rooms = Arc.ROOMS.filter(r => !r.solo).map(r => '<option value="' + r.id + '"' + (r.id === f.room ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('');
   const host = acct
-    ? '<div class="vs-panel"><h2>Host an arena</h2><p class="vs-sub">Pick the deck and room. Everyone gets the same 10 questions.</p>' +
+    ? '<div class="vs-panel"><h2>Host an arena</h2><p class="vs-sub">Pick the deck, room and round length. Everyone gets the same questions.</p>' +
       '<div class="vs-row2" style="margin-top:12px"><div class="vs-f"><label for="vs-deck">Deck</label><select id="vs-deck" data-vs="deck">' + decks + '</select></div>' +
       '<div class="vs-f"><label for="vs-room">Room</label><select id="vs-room" data-vs="room">' + rooms + '</select></div>' +
+      qnField('vs-qn', f.qn) +
       '<div class="vs-f" style="flex:0 1 110px"><label for="vs-cap">Players (2-20)</label><input id="vs-cap" type="number" min="2" max="20" inputmode="numeric" data-vs="cap" value="' + f.cap + '"></div></div>' +
       '<label class="vs-chk"><input type="checkbox" data-vs="listed"' + (f.listed ? ' checked' : '') + '> List in class lobby</label>' +
       '<label class="vs-chk"><input type="checkbox" data-vs="allow-guests"' + (f.allowGuests ? ' checked' : '') + '> Allow guests</label>' +
@@ -345,6 +353,9 @@ function menuHTML() {
   return topBar('<button class="btn ghost small" data-vs="close">Back to arcade</button>') + errBox() +
     '<div class="vs-grid"><div>' + join + lobby + '</div><div>' + host + '</div></div>';
 }
+// Round length select, used in the host menu and (host only) in the lobby.
+const qnField = (id, val) => '<div class="vs-f" style="flex:0 1 110px"><label for="' + id + '">Questions</label><select id="' + id + '" data-vs="qn">' +
+  QN_OK.map(n => '<option value="' + n + '"' + (n === qnOk(+val) ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div>';
 function renderLobbyList() {
   const ul = q$('[data-vs="lobby-list"]'); if (!ul) return;
   const now = Date.now();
@@ -352,7 +363,7 @@ function renderLobbyList() {
   if (!rows.length) { ul.innerHTML = '<li class="vs-sub" data-vs="lobby-empty">No open arenas right now. Ask your teacher to host one, or host your own.</li>'; return; }
   ul.innerHTML = rows.map(d => {
     const deck = Arc.DECKS.find(x => x.id === d.deck), room = Arc.ROOMS.find(x => x.id === d.room);
-    return '<li class="vs-lobbyrow"><div><b>' + esc(d.hostNick) + '\'s arena</b><small>' + esc(room ? room.name : d.room) + ' &middot; ' + esc(deck ? deck.name : d.deck) + ' &middot; ' + (d.playerCount || 0) + '/' + (d.cap || 20) + ' players</small></div>' +
+    return '<li class="vs-lobbyrow"><div><b>' + esc(d.hostNick) + '\'s arena</b><small>' + esc(room ? room.name : d.room) + ' &middot; ' + esc(deck ? deck.name : d.deck) + ' &middot; ' + qnOk(d.qn) + ' questions &middot; ' + (d.playerCount || 0) + '/' + (d.cap || 20) + ' players</small></div>' +
       '<button class="btn small" data-vs="lobby-join" data-code="' + esc(d.code) + '">Join</button></li>';
   }).join('');
 }
@@ -379,6 +390,7 @@ function onInput(e) {
   if (k === 'join-code-input') { ui.form.code = t.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (t.value !== ui.form.code) t.value = ui.form.code; }
   else if (k === 'deck') ui.form.deck = t.value;
   else if (k === 'room') ui.form.room = t.value;
+  else if (k === 'qn') { if (!R) ui.form.qn = qnOk(+t.value); else if (e.type === 'change') hostSetting('qn', qnOk(+t.value)); }
   else if (k === 'cap') { if (!R) ui.form.cap = t.value; else if (e.type === 'change') hostSetting('cap', clampCap(t.value)); }
   else if (k === 'listed') { if (!R) ui.form.listed = t.checked; else hostSetting('listed', t.checked); }
   else if (k === 'allow-guests') { if (!R) ui.form.allowGuests = t.checked; else hostSetting('allowGuests', t.checked); }
@@ -504,7 +516,7 @@ async function hostFlow() {
   if (!acct) { setErr(MSG.host); return; }
   ui.busy = true; setErr(''); softBusy();
   try {
-    const code = await createMatch({ deck: ui.form.deck || 's20', room: ui.form.room || 'mixed', cap: clampCap(ui.form.cap), allowGuests: !!ui.form.allowGuests, listed: !!ui.form.listed });
+    const code = await createMatch({ deck: ui.form.deck || 's20', room: ui.form.room || 'mixed', qn: qnOk(+ui.form.qn), cap: clampCap(ui.form.cap), allowGuests: !!ui.form.allowGuests, listed: !!ui.form.listed });
     ui.busy = false;
     attach(code, false);
   } catch (e) { ui.busy = false; setErr(MSG[e && e.vs] || MSG.net); softBusy(); }
@@ -518,12 +530,12 @@ async function createMatch(o) {
     try { taken = (await F.getDoc(mref)).exists(); } catch (e) { taken = false; }
     if (taken) continue;
     const now = Date.now(), b = F.writeBatch(db);
-    b.set(mref, {
+    b.set(mref, Object.assign({
       hostUid: uid, hostNick: acct.nick, cls: acct.cls, deck: o.deck, room: o.room, seed: (Math.random() * 0x100000000) >>> 0,
       cap: o.cap, allowGuests: o.allowGuests, listed: o.listed, status: 'lobby', createdAt: F.serverTimestamp(),
       expireAt: F.Timestamp.fromMillis(now + LOBBY_BASE * TS()), playerCount: 1, startAt: null, alive: 1, aggUid: uid,
       aggUntil: F.Timestamp.fromMillis(now + AGG_BASE * TS()), winnerUid: null, endedAt: null, rematch: null
-    });
+    }, o.qn && o.qn !== QN_DEF ? { qn: o.qn } : {}));   // qn only when not the default, so 10-question hosting works on rules that predate it
     b.set(F.doc(db, 'matches', code, 'players', uid), seat(acct.nick, false));
     try { await b.commit(); }
     catch (e) {
@@ -541,7 +553,7 @@ function attach(code, guest) {
   const F = fb.F, db = fb.db, uid = C.uid();
   R = {
     code, uid, guest: !!guest, view: 'lobby', match: null, matchLoaded: false, players: {}, frozen: {}, round: null, roundKey: '',
-    answers: {}, my: { score: 0, correct: 0, totalMs: 0, streak: 0 }, granted: {}, cardsGiven: {}, rewards: null, rewarded: false,
+    answers: {}, pending: [], checking: false, my: { score: 0, correct: 0, totalMs: 0, streak: 0 }, granted: {}, cardsGiven: {}, rewards: null, rewarded: false,
     phase: null, phaseKey: null, shownAt: 0, startMs: 0, unsubs: [], unsubPlayers: null, unsubPresence: null, timers: [],
     rankBefore: {}, lastReact: 0, leaveArmed: 0, ladderTops: null, lastCount: -1, aggBusy: false, ending: false,
     mref: F.doc(db, 'matches', code), pref: F.doc(db, 'matches', code, 'players', uid), seenRematch: null, kicked: false, left: false
@@ -612,11 +624,12 @@ function route() {
 
 /* ---------- lobby ---------- */
 const isHost = () => R && R.match && R.match.hostUid === R.uid;
+const nQ = () => qnOk(R && R.match && R.match.qn);   // this match's round length
 const seated = () => Object.keys(R.players).map(k => Object.assign({ uid: k }, R.players[k])).filter(p => !p.left);
 function lobbyHTML() {
   const host = isHost(), m = R.match || {};
   const ctl = host
-    ? '<div class="vs-row2" style="margin-top:14px"><div class="vs-f" style="flex:0 1 120px"><label for="vs-cap2">Players (2-20)</label><input id="vs-cap2" type="number" min="2" max="20" inputmode="numeric" data-vs="cap" value="' + (m.cap || 20) + '"></div></div>' +
+    ? '<div class="vs-row2" style="margin-top:14px">' + qnField('vs-qn2', m.qn) + '<div class="vs-f" style="flex:0 1 120px"><label for="vs-cap2">Players (2-20)</label><input id="vs-cap2" type="number" min="2" max="20" inputmode="numeric" data-vs="cap" value="' + (m.cap || 20) + '"></div></div>' +
       '<label class="vs-chk"><input type="checkbox" data-vs="listed"' + (m.listed ? ' checked' : '') + '> List in class lobby</label>' +
       '<label class="vs-chk"><input type="checkbox" data-vs="allow-guests"' + (m.allowGuests ? ' checked' : '') + '> Allow guests</label>' +
       '<div class="vs-center" style="margin-top:14px"><button class="btn" data-vs="start" disabled>Start arena</button></div>'
@@ -624,7 +637,8 @@ function lobbyHTML() {
   return topBar('') + errBox() +
     '<div class="vs-panel"><h2 style="text-align:center">Arena code</h2><div class="vs-bigcode" data-vs="code" aria-label="Arena code">' + codeHTML(R.code) + '</div>' +
     '<div class="vs-center"><button class="btn ghost small" data-vs="copy">' + (ui.copied ? 'Copied' : 'Copy code') + '</button></div>' +
-    '<p class="vs-sub" style="text-align:center;margin-top:10px">Players: open VS Arena and type the code, or join from the class lobby.</p></div>' +
+    '<p class="vs-sub" style="text-align:center;margin-top:10px">Players: open VS Arena and type the code, or join from the class lobby.</p>' +
+    '<p class="vs-sub" style="text-align:center;margin-top:4px" id="vs-qlen">' + qnOk(m.qn) + ' questions</p></div>' +
     '<div class="vs-panel"><h2>In the arena <span id="vs-count" class="vs-sub"></span></h2><ul class="vs-plist" data-vs="lobby-players"></ul>' + ctl +
     '<p class="vs-sub" id="vs-expiry" style="margin-top:12px"></p>' +
     '<div class="vs-center" style="margin-top:12px"><button class="btn ghost small" data-vs="leave">Leave arena</button></div></div>';
@@ -642,6 +656,8 @@ function updateLobby() {
     }
   }
   const cnt = q$('#vs-count'); if (cnt) cnt.textContent = list.length + '/' + (m.cap || 20);
+  const ql = q$('#vs-qlen'); if (ql) setTxt(ql, qnOk(m.qn) + ' questions');
+  const qs = q$('[data-vs="qn"]'); if (qs && document.activeElement !== qs) qs.value = String(qnOk(m.qn));
   const hostGone = R.players[m.hostUid] && R.players[m.hostUid].left;
   const st = q$('[data-vs="start"]'); if (st) st.disabled = list.length < 2 || !!hostGone;
   const w = q$('#vs-wait'); if (w && hostGone) w.textContent = 'The host left, so this arena will not start. You can leave.';
@@ -731,8 +747,8 @@ function onPageShow() {
 /* ---------- play: clock ---------- */
 function enterPlay() {
   const F = fb.F, m = R.match;
-  const key = m.deck + '|' + m.room + '|' + m.seed;
-  if (R.roundKey !== key) { try { R.round = Arc.buildRound(m.deck, m.room, m.seed); } catch (e) { R.round = []; } R.roundKey = key; }
+  const key = m.deck + '|' + m.room + '|' + m.seed + '|' + nQ();
+  if (R.roundKey !== key) { try { R.round = Arc.buildRound(m.deck, m.room, m.seed, nQ()); } catch (e) { R.round = []; } R.roundKey = key; }
   R.frozen = freeze(R.players); R.phase = null; R.phaseKey = null;
   heartbeat();
   R.timers.push(setInterval(() => { heartbeat(); aggTick(); }, Math.max(40, Math.round(BEAT_BASE * TS()))));
@@ -746,7 +762,7 @@ function currentPhase() {
   if (!R.startMs) return { name: 'wait' };
   const now = Date.now(), base = R.startMs + LEAD_MS();
   if (now < base) return { name: 'lead', left: base - now, into: now - R.startMs };
-  return phaseAt(now, base);
+  return phaseAt(now, base, nQ());
 }
 function tick() {
   if (!R) return;
@@ -799,7 +815,8 @@ function answer(i) {
   b.set(F.doc(db, 'matches', R.code, 'answers', R.uid + '_' + idx), { q: idx, choice: i, elapsedMs: Math.round(elapsed), correct, points: pts, at: F.serverTimestamp() });
   // Increments, not totals: the rules check each one against this answer doc, and a reloaded tab can't clobber the score.
   b.update(R.pref, { score: F.increment(pts), correct: F.increment(correct ? 1 : 0), totalMs: F.increment(Math.round(elapsed)), answeredQ: idx, lastSeen: F.serverTimestamp(), streak: my.streak });
-  b.commit().catch(() => { setErr('Your answer may not have reached the server. Check your connection.'); });
+  const r = R;
+  r.pending.push(b.commit().then(() => true, () => { if (R === r) setErr('Your answer may not have reached the server. Check your connection.'); return false; }));
 }
 // Called when a question's reveal begins: card XP, feedback, timeout streak reset.
 function settle(idx) {
@@ -852,7 +869,7 @@ function renderStage() {
   if (ph.name === 'wait') { el.innerHTML = '<div class="vs-splash"><div class="vs-arena-word" style="font-size:40px">Starting...</div></div>'; return; }
   if (ph.name === 'lead') { el.innerHTML = splashHTML(); splashTones(); return; }
   const idx = ph.index, q = R.round && R.round[idx];
-  const qno = q$('#vs-qno'); if (qno) qno.textContent = 'Question ' + (idx + 1) + ' of ' + N_Q;
+  const qno = q$('#vs-qno'); if (qno) qno.textContent = 'Question ' + (idx + 1) + ' of ' + nQ();
   if (!q) { el.innerHTML = '<div class="vs-panel"><p class="vs-sub">This question could not be loaded. Hang tight.</p></div>'; return; }
   const a = R.answers[idx];
   if (ph.name === 'done') { el.innerHTML = '<div class="vs-panel"><h2>Totaling the scores...</h2></div>'; return; }
@@ -1045,15 +1062,16 @@ async function aggTick() {
       R.presence = R.presence || {};
       R.unsubPresence = F.onSnapshot(F.collection(db, 'matches', R.code, 'presence'), s => { const o = {}; s.forEach(d => { o[d.id] = d.data(); }); R.presence = o; }, () => {});
     }
-    // Mark players abandoned who missed the last finished question and have gone quiet.
+    // Mark players abandoned who have been quiet for STALE_BASE and missed the last two finished questions. One
+    // missed question on a slow connection is not enough: abandoned is permanent and refuses every later answer.
     const ph = currentPhase();
-    const lastDone = ph.name === 'reveal' || ph.name === 'done' ? (ph.name === 'done' ? N_Q - 1 : ph.index) : (ph.index != null ? ph.index - 1 : -1);
-    if (lastDone >= 0) {
+    const lastDone = ph.name === 'reveal' || ph.name === 'done' ? (ph.name === 'done' ? nQ() - 1 : ph.index) : (ph.index != null ? ph.index - 1 : -1);
+    if (lastDone >= 1) {
       for (const p of liveRows()) {
         if (p.uid === R.uid || p.abandoned) continue;
         const pr = R.presence && R.presence[p.uid];
         const sig = Math.max(pr ? (pr.at ? toMs(pr.at) : now) : 0, toMs(p.lastSeen) || 0, toMs(p.joinedAt) || 0);
-        if (now - sig > STALE_BASE * TS() && (p.answeredQ == null ? -1 : p.answeredQ) < lastDone) {
+        if (now - sig > STALE_BASE * TS() && (p.answeredQ == null ? -1 : p.answeredQ) < lastDone - 1) {
           p.abandoned = true; R.players[p.uid] = Object.assign({}, R.players[p.uid], { abandoned: true });
           await F.updateDoc(F.doc(db, 'matches', R.code, 'players', p.uid), { abandoned: true }).catch(() => {});
         }
@@ -1097,12 +1115,37 @@ function finalOrder() {
   const rows = liveRows().filter(p => !hidden(p));
   // winnerUid is not trusted for placing (any participant can write it). Players who dropped out rank below
   // everyone who stayed, which also makes the last player standing win a forfeit.
-  const out = p => !!(p.abandoned || (p.left && (p.answeredQ == null ? -1 : p.answeredQ) < N_Q - 1));
+  const out = p => !!(p.abandoned || (p.left && (p.answeredQ == null ? -1 : p.answeredQ) < nQ() - 1));
   return rankPlayers(rows.filter(p => !out(p))).concat(rankPlayers(rows.filter(out)));
 }
+/* Final score check. During the match the ladder shows only what this phone has heard so far, and a slow phone's
+   last answers can still be on their way when the clock ends the match. So the podium is not drawn from the ladder:
+   1. wait for this phone's own answer writes to be acknowledged (or fail),
+   2. on a clock finish, wait until every seated player's last answer is in or the late window of the last question
+      closes (LATE_BASE after it closes; the rules refuse anything later), whichever comes first,
+   3. read every seat once from the server. That read decides the podium, the placement bonus and the VS record. */
+const allIn = (r, last) => Object.keys(r.players).every(k => { const p = r.players[k]; return gone(p) || hidden(p) || (p.answeredQ == null ? -1 : p.answeredQ) >= last; });
+async function finalCheck(r) {
+  const F = fb.F, last = nQ() - 1, now = Date.now();
+  const until = t => new Promise(res => setTimeout(res, Math.max(0, t - Date.now())));
+  const lastClose = r.startMs + LEAD_MS() + last * SLOT() + Q_MS();
+  const clockEnd = !!r.startMs && now >= lastClose - 2000 * TS();             // false for a forfeit part way through
+  const deadline = clockEnd ? Math.max(now, lastClose + LATE_MS()) : now + 1500 * TS();
+  await Promise.race([Promise.all(r.pending), until(deadline)]);
+  while (clockEnd && R === r && Date.now() < deadline && !allIn(r, last)) await until(Math.min(deadline, Date.now() + 150 * TS()));
+  try {
+    const snap = await F.getDocs(F.collection(fb.db, 'matches', r.code, 'players'));
+    const map = {}; snap.forEach(d => { map[d.id] = d.data(); });
+    if (Object.keys(map).length) r.players = map;
+  } catch (e) { /* offline: keep what the players listener last delivered */ }
+}
 function enterResult() {
-  stopTimers(); detachPlayers();
-  if (R.rewarded) return;
+  stopTimers();
+  if (R.rewarded || R.checking) return;
+  const r = R; r.checking = true;
+  finalCheck(r).then(() => { if (R !== r) return; r.checking = false; detachPlayers(); award(); render(); });
+}
+function award() {
   R.rewarded = true;
   const order = finalOrder(), place = order.findIndex(p => p.uid === R.uid) + 1;
   const me = R.players[R.uid] || {};
@@ -1131,6 +1174,7 @@ function enterResult() {
   if (m.rematch) R.seenRematch = m.rematch;
 }
 function resultHTML() {
+  if (R.checking) return topBar('') + errBox() + '<div class="vs-panel" data-vs="final-check" role="status" style="text-align:center"><h2>Checking final scores...</h2><p class="vs-sub">Giving slow connections a moment so every answer counts.</p></div>';
   const m = R.match, order = finalOrder(), rw = R.rewards || {}, S = Arc.S;
   const meP = R.players[R.uid] || {};
   const podium = order.slice(0, 3);
@@ -1138,7 +1182,7 @@ function resultHTML() {
   const pod = podium.length === 3 ? slot(podium[1], 1) + slot(podium[0], 0) + slot(podium[2], 2) : podium.length === 2 ? slot(podium[1], 1) + slot(podium[0], 0) : podium.map(slot).join('');
   const field = order.map((p, i) => '<tr class="' + (p.uid === R.uid ? 'me' : '') + '" data-uid="' + esc(p.uid) + '"><td>' + (i + 1) + '</td><td><span class="pl">' + av(p.icon, 28) + '<span>' + esc(p.nick) + (p.uid === R.uid ? ' (you)' : '') + '</span>' + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + (gone(p) ? '<span class="vs-tag">Left</span>' : '') + '</span></td><td class="r">' + (p.score || 0) + '</td><td class="r">' + (p.correct || 0) + '</td></tr>').join('');
   let rows = '';
-  for (let i = 0; i < N_Q; i++) {
+  for (let i = 0; i < nQ(); i++) {
     const a = R.answers[i], q = R.round && R.round[i]; const card = q && Arc.BY[q.cardId];
     rows += '<tr><td>' + (i + 1) + '</td><td>' + esc(card ? card.name : '') + '</td><td>' + (a ? (a.correct ? '<span class="vs-ok">Right</span>' : '<span class="vs-no">Wrong</span>') : '<span class="vs-no">No answer</span>') + '</td><td class="r">' + (a ? a.points : 0) + '</td><td class="r">' + (a ? (a.elapsedMs / 1000 / TS()).toFixed(1) + 's' : '-') + '</td></tr>';
   }
@@ -1151,11 +1195,14 @@ function resultHTML() {
       (rw.lvAfter > rw.lvBefore ? '<p><span class="vs-pill">LEVEL UP: Lv ' + rw.lvAfter + ' ' + esc(Arc.levelInfo(S.xp).title) + '</span></p>' : '') +
       (rw.record ? '<p class="vs-sub" data-vs="vs-result-record">VS record: ' + rw.record.w + '-' + rw.record.l + (rw.record.streak ? ' &middot; streak ' + rw.record.streak : '') + '</p>' : '');
   } else rewards = '<p class="vs-sub">' + (meP.abandoned || R.kicked ? 'You were disconnected before the end, so there is no placement bonus.' : abandoned ? 'Everyone left before the end.' : 'No placement bonus this time.') + '</p>';
+  // The server total is the score that counts. If this phone tallied more, some answers never landed: say so.
+  const lost = (R.my.score || 0) - (meP.score || 0);
+  const lostHTML = lost > 0 ? '<p class="vs-sub" data-vs="lost-points">' + lost + ' of your points did not reach the server in time, so they do not count.</p>' : '';
   const cta = R.guest ? '<div class="vs-panel" data-vs="guest-cta"><p style="margin:0">Sign in or create an account to save your cards and keep your VS record.</p><div style="margin-top:10px"><button class="btn small" data-vs="guest-signin">Sign in</button></div></div>' : '';
   return topBar('') + errBox() + '<div id="vs-rematch"></div>' +
     '<div class="vs-panel"><h2 style="text-align:center;font-size:30px">' + esc(title) + '</h2>' + (forfeit ? '<p class="vs-sub" style="text-align:center">Won by forfeit: the other players left.</p>' : '') +
     '<div class="vs-podium" data-vs="podium">' + pod + '</div></div>' +
-    '<div class="vs-panel"><h2>Your result</h2><p style="margin:0;font:400 28px/1 var(--display);color:var(--gold)">' + (R.my.score || meP.score || 0) + ' pts &middot; ' + (meP.correct || R.my.correct || 0) + '/' + N_Q + ' right</p>' + rewards + '</div>' + cta +
+    '<div class="vs-panel"><h2>Your result</h2><p style="margin:0;font:400 28px/1 var(--display);color:var(--gold)">' + (meP.score || 0) + ' pts &middot; ' + (meP.correct || 0) + '/' + nQ() + ' right</p>' + lostHTML + rewards + '</div>' + cta +
     // Phones: the per-question breakdown starts closed so the podium page stays short.
     '<div class="vs-play"><details class="vs-panel" data-vs="answers"' + (narrow() ? '' : ' open') + '><summary>Your answers</summary><div style="overflow-x:auto"><table class="vs-tbl" data-vs="breakdown"><thead><tr><th>#</th><th>Card</th><th>Result</th><th class="r">Pts</th><th class="r">Time</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>' +
     '<div class="vs-panel"><h2>The field</h2><div style="overflow-x:auto"><table class="vs-tbl" data-vs="field"><thead><tr><th>#</th><th>Player</th><th class="r">Score</th><th class="r">Right</th></tr></thead><tbody>' + field + '</tbody></table></div></div></div>' +
@@ -1177,7 +1224,7 @@ async function rematch() {
   if (!R || !isHost() || ui.busy) return;
   const m = R.match; ui.busy = true;
   try {
-    const code = await createMatch({ deck: m.deck, room: m.room, cap: m.cap, allowGuests: m.allowGuests, listed: m.listed });
+    const code = await createMatch({ deck: m.deck, room: m.room, qn: qnOk(m.qn), cap: m.cap, allowGuests: m.allowGuests, listed: m.listed });
     await fb.F.updateDoc(R.mref, { rematch: code });
     ui.busy = false;
     teardown(); attach(code, false);

@@ -16,6 +16,7 @@ export async function hostArena(dev, o = {}) {
   await openVs(dev);
   if (o.deck) await p.selectOption('[data-vs="deck"]', o.deck);
   if (o.room) await p.selectOption('[data-vs="room"]', o.room);
+  if (o.qn) await p.selectOption('[data-vs="qn"]', String(o.qn));
   if (o.cap != null) await p.fill('[data-vs="cap"]', String(o.cap));
   if (o.listed != null) await p.setChecked('[data-vs="listed"]', o.listed);
   if (o.allowGuests != null) await p.setChecked('[data-vs="allow-guests"]', o.allowGuests);
@@ -49,14 +50,14 @@ export async function startMatch(host, players = 2) {
 }
 export const errorText = dev => dev.page.locator('[data-vs="error"]:not([hidden])');
 
-/** The ten correct option indexes for a match (computed in the page with the same buildRound the app uses). */
+/** The correct option indexes for a match, one per question (computed in the page with the same buildRound the app uses). */
 export async function correctIndexes(dev, arena, code) {
   const m = arena.backend.adminGet('matches/' + code);
-  return dev.page.evaluate(([d, r, s]) => window.Arcade.buildRound(d, r, s).map(q => q.correct), [m.deck, m.room, m.seed]);
+  return dev.page.evaluate(([d, r, s, n]) => window.Arcade.buildRound(d, r, s, n).map(q => q.correct), [m.deck, m.room, m.seed, m.qn]);
 }
 export async function promptsOf(dev, arena, code) {
   const m = arena.backend.adminGet('matches/' + code);
-  return dev.page.evaluate(([d, r, s]) => window.Arcade.buildRound(d, r, s).map(q => q.prompt), [m.deck, m.room, m.seed]);
+  return dev.page.evaluate(([d, r, s, n]) => window.Arcade.buildRound(d, r, s, n).map(q => q.prompt), [m.deck, m.room, m.seed, m.qn]);
 }
 
 /**

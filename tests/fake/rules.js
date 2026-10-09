@@ -24,6 +24,7 @@ const MAX_CAP = 20, MIN_CAP = 2;
 
 export const MATCH_KEYS = ['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests', 'listed', 'status',
   'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil', 'winnerUid', 'endedAt', 'rematch'];
+const MATCH_OPTIONAL = ['qn'];   // hasOnly allows it, hasAll does not require it
 export const PLAYER_KEYS = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'reaction',
   'reactionAt', 'abandoned', 'left', 'streak'];
 const SEAT_KEYS = PLAYER_KEYS.concat(['icon']);     // icon is optional: hasOnly allows it, hasAll does not require it
@@ -54,8 +55,12 @@ const asAlts = op => (Array.isArray(op) && op.length && !Array.isArray(op[0]) &&
 // ---- shared predicates ----
 // Time windows come from the real rules (ms at VS_TIME_SCALE 1); c.ts is the backend's timeScale so tests can run fast.
 const grace = c => Math.max(2000 * c.ts, 400);          // clock-drift grace: 2 s real, but never tighter than 400 ms in scaled runs
+const QNS = [10, 15, 20];
+const qn = m => (m && 'qn' in m ? m.qn : 10);          // rules: m.get('qn', 10)
+const matchQn = c => qn(c.get(matchPath(c)));
+const LATE = 8000;                                      // vs.js LATE_BASE: arrival allowed until the question closes + 8 s
 const qOpensAt = (c, m, q) => ms(m.startAt) + (5000 + q * 17500) * c.ts;
-const clockOver = (c, m) => c.time > ms(m.startAt) + 178000 * c.ts;
+const clockOver = (c, m) => c.time > ms(m.startAt) + (3000 + qn(m) * 17500) * c.ts;
 const signedIn = ['signed in', c => c.signedIn];
 const notAnon = ['not anonymous (isAccount)', c => c.signedIn && !c.anon];
 const matchPath = c => 'matches/' + c.params.code;
@@ -70,7 +75,8 @@ const participantClause = ['participant', c => isParticipant(c)];
 const matchCreate = [
   signedIn, notAnon,
   ['code is 6 chars from the alphabet', c => validCode(c.params.code)],
-  ['exactly the allowed keys', c => hasOnly(c.inc, MATCH_KEYS) && hasAll(c.inc, MATCH_KEYS)],
+  ['exactly the allowed keys (qn optional)', c => hasOnly(c.inc, MATCH_KEYS.concat(MATCH_OPTIONAL)) && hasAll(c.inc, MATCH_KEYS)],
+  ['qn (if present) is 10, 15 or 20', c => QNS.includes(qn(c.inc))],
   ['hostUid == uid', c => c.inc.hostUid === c.uid],
   ['cls and hostNick match the host /players doc', c => { const p = ownPlayerDoc(c); return !!p && c.inc.cls === p.cls && c.inc.hostNick === p.nick; }],
   ['deck and room are known ids', c => DECK_IDS.includes(c.inc.deck) && ROOM_IDS.includes(c.inc.room)],
@@ -85,7 +91,7 @@ const matchCreate = [
   ['aggUid == uid, aggUntil is a timestamp', c => c.inc.aggUid === c.uid && isTs(c.inc.aggUntil)],
   ['winnerUid, endedAt, rematch are null', c => c.inc.winnerUid === null && c.inc.endedAt === null && c.inc.rematch === null]
 ];
-const SETTINGS = ['deck', 'room', 'seed', 'cap', 'allowGuests', 'listed'];
+const SETTINGS = ['deck', 'room', 'seed', 'qn', 'cap', 'allowGuests', 'listed'];
 const has = (c, k) => c.changed.includes(k);
 const isHostOf = c => c.res.hostUid === c.uid;
 
@@ -99,7 +105,8 @@ const matchUpdate = [
   alt('2. host edits lobby settings',
     signedIn, ['caller is the host', c => isHostOf(c)],
     ['lobby before and after', c => c.res.status === 'lobby' && c.inc.status === 'lobby'],
-    ['only deck, room, seed, cap, allowGuests, listed change', c => subset(c.changed, SETTINGS)],
+    ['only deck, room, seed, qn, cap, allowGuests, listed change', c => subset(c.changed, SETTINGS)],
+    ['qn is 10, 15 or 20', c => QNS.includes(qn(c.inc))],
     ['deck and room known', c => DECK_IDS.includes(c.inc.deck) && ROOM_IDS.includes(c.inc.room)],
     ['seed is a uint32', c => intIn(c.inc.seed, 0, 4294967295)],
     ['cap 2..20 and >= playerCount', c => intIn(c.inc.cap, MIN_CAP, MAX_CAP) && c.inc.cap >= c.res.playerCount],
@@ -121,7 +128,7 @@ const matchUpdate = [
     ["res.status == 'playing'", c => c.res.status === 'playing'],
     ['only status, winnerUid, endedAt, alive, aggUid, aggUntil change', c => subset(c.changed, ['status', 'winnerUid', 'endedAt', 'alive', 'aggUid', 'aggUntil'])],
     ['status stays playing, or becomes abandoned, or done with winnerUid unset before', c => c.inc.status === 'playing' || c.inc.status === 'abandoned' || (c.inc.status === 'done' && c.res.winnerUid === null)],
-    ['before startAt+178s only an account may end the match (a guest cannot cut it short)', c => c.inc.status === 'playing' || !c.anon || clockOver(c, c.res)],
+    ['before the last question is over only an account may end the match (a guest cannot cut it short)', c => c.inc.status === 'playing' || !c.anon || clockOver(c, c.res)],
     ['done must set winnerUid', c => c.inc.status !== 'done' || has(c, 'winnerUid')],
     ['winnerUid only with done, and must be seated', c => !has(c, 'winnerUid') || (c.inc.status === 'done' && isStr(c.inc.winnerUid) && c.exists(seatPath(c, c.inc.winnerUid)))],
     ['endedAt == request.time exactly when ending', c => c.inc.status === 'playing' ? !has(c, 'endedAt') : ms(c.inc.endedAt) === c.time],
@@ -168,7 +175,7 @@ const seatUpdateSelf = alt('update own seat',
   ['seat keys only', c => hasOnly(c.inc, SEAT_KEYS)],
   ['icon (if present) is a preset id', c => iconOk(c.inc)],
   ['only lastSeen, score, correct, totalMs, answeredQ, reaction, reactionAt, abandoned, left, streak, icon change (nick, guest, joinedAt fixed)', c => subset(c.changed, SEAT_MUTABLE)],
-  ['answeredQ never decreases and is <= 9', c => c.inc.answeredQ >= c.res.answeredQ && c.inc.answeredQ <= 9],
+  ['answeredQ never decreases and is <= qn - 1', c => c.inc.answeredQ >= c.res.answeredQ && c.inc.answeredQ <= matchQn(c) - 1],
   ['an abandoned player stays abandoned', c => !(c.res.abandoned === true && c.inc.abandoned !== true)],
   ['score/correct/totalMs/answeredQ move only with a brand-new answer doc, by exactly its values', c => {
     if (!c.changed.some(k => ['score', 'correct', 'totalMs', 'answeredQ'].includes(k))) return true;
@@ -177,11 +184,11 @@ const seatUpdateSelf = alt('update own seat',
     const a = c.getAfter(ap);
     return c.inc.score === c.res.score + a.points && c.inc.correct === c.res.correct + (a.correct ? 1 : 0) && c.inc.totalMs === c.res.totalMs + a.elapsedMs;
   }],
-  ['score grows by <= 150 per write, <= 1500', c => c.inc.score >= c.res.score && c.inc.score - c.res.score <= 150 && c.inc.score <= 1500],
-  ['correct non-decreasing and <= 10; totalMs non-decreasing', c => c.inc.correct >= c.res.correct && c.inc.correct <= 10 && c.inc.totalMs >= c.res.totalMs],
-  ['streak 0..10', c => c.inc.streak >= 0 && c.inc.streak <= 10],
+  ['score grows by <= 150 per write, <= 150 * qn', c => c.inc.score >= c.res.score && c.inc.score - c.res.score <= 150 && c.inc.score <= 150 * matchQn(c)],
+  ['correct non-decreasing and <= qn; totalMs non-decreasing', c => c.inc.correct >= c.res.correct && c.inc.correct <= matchQn(c) && c.inc.totalMs >= c.res.totalMs],
+  ['streak 0..qn', c => c.inc.streak >= 0 && c.inc.streak <= matchQn(c)],
   ['reaction is null or one of nice, hmm, fire, gg, oops', c => c.inc.reaction === null || REACTIONS.includes(c.inc.reaction)],
-  ['finished matches only accept lastSeen, reaction, reactionAt, left', c => ['lobby', 'playing'].includes(matchStatus(c)) || subset(c.changed, ['lastSeen', 'reaction', 'reactionAt', 'left'])]);
+  ['done still takes a late last answer; abandoned/expired only accept lastSeen, reaction, reactionAt, left', c => ['lobby', 'playing', 'done'].includes(matchStatus(c)) || subset(c.changed, ['lastSeen', 'reaction', 'reactionAt', 'left'])]);
 const seatMarkAbandoned = alt("aggregator marks someone else's seat abandoned",
   signedIn, notAnon, participantClause, ['not own seat', c => c.params.pid !== c.uid],
   ['match is playing', c => matchStatus(c) === 'playing'],
@@ -190,19 +197,19 @@ const seatMarkAbandoned = alt("aggregator marks someone else's seat abandoned",
 // ---- matches/{code}/answers/{aid} ----
 const answerCreate = [
   signedIn, participantClause,
-  ["match is 'playing'", c => matchStatus(c) === 'playing'],
+  ["match is 'playing', or 'done' for the last question's late answer", c => matchStatus(c) === 'playing' || (matchStatus(c) === 'done' && c.inc.q === matchQn(c) - 1)],
   ['exactly the allowed keys', c => hasOnly(c.inc, ANSWER_KEYS) && hasAll(c.inc, ANSWER_KEYS)],
-  ['q int 0..9 and id == {uid}_{q}', c => intIn(c.inc.q, 0, 9) && c.params.aid === c.uid + '_' + c.inc.q],
+  ['q int 0..qn-1 and id == {uid}_{q}', c => intIn(c.inc.q, 0, matchQn(c) - 1) && c.params.aid === c.uid + '_' + c.inc.q],
   ['choice int 0..3', c => intIn(c.inc.choice, 0, 3)],
   ['elapsedMs >= 0, correct boolean', c => typeof c.inc.elapsedMs === 'number' && c.inc.elapsedMs >= 0 && isBool(c.inc.correct)],
   ['points int 0..150, 0 when wrong', c => intIn(c.inc.points, 0, 150) && (c.inc.correct || c.inc.points === 0)],
   ['the same batch sets seat.answeredQ == q', c => { const s = c.getAfter(seatPath(c, c.uid)); return !!s && s.answeredQ === c.inc.q; }],
   ['seat is not abandoned', c => { const s = c.get(seatPath(c, c.uid)); return !!s && s.abandoned !== true; }],
   ['elapsedMs <= 15000 (scaled)', c => c.inc.elapsedMs <= 15000 * c.ts],
-  ['only while the question is on screen: qOpens - grace <= time <= qOpens + 17 s', c => {
+  ['arrives between qOpens - grace and the question closing + 8 s (late window)', c => {
     const m = c.get(matchPath(c)); if (!m || !isTs(m.startAt)) return false;
     const open = qOpensAt(c, m, c.inc.q);
-    return c.time >= open - grace(c) && c.time <= open + 17000 * c.ts;
+    return c.time >= open - grace(c) && c.time <= open + (15000 + LATE) * c.ts;
   }]
 ];
 
