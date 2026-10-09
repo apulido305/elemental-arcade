@@ -634,7 +634,7 @@ const GEN={
     const pool=dpool(it).filter(x=>x.id!==it.id);
     const same=shuffle(pool.filter(x=>x.family===it.family));
     const rest=shuffle(pool.filter(x=>x.family!==it.family));
-    const opts=mkOpts(esc(it.name),same.slice(0,2).concat(rest).map(x=>esc(x.name)));
+    const opts=mkOpts(esc(it.name),same.slice(0,2).concat(rest).concat(same.slice(2)).map(x=>esc(x.name)));
     if(!opts)return null;
     return{prompt:'Which '+kindWord(it)+' has this ability?',clue:abox(it),opts,
       exp:'<p>It is <b>'+esc(it.name)+'</b>. Its ability is <b>'+esc(it.ability)+'</b>.</p>'};
