@@ -80,7 +80,7 @@ service cloud.firestore {
         && request.resource.data.cls == get(playerDoc(request.auth.uid)).data.cls
         && request.resource.data.hostNick == get(playerDoc(request.auth.uid)).data.nick
         && request.resource.data.deck in ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all']
-        && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'mixed']
+        && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed']
         && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
         && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
         && request.resource.data.allowGuests is bool
@@ -115,7 +115,7 @@ service cloud.firestore {
             && request.resource.data.status == 'lobby'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deck', 'room', 'seed', 'cap', 'allowGuests', 'listed'])
             && request.resource.data.deck in ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all']
-            && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'mixed']
+            && request.resource.data.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed']
             && request.resource.data.seed is int && request.resource.data.seed >= 0 && request.resource.data.seed < 4294967296
             && request.resource.data.cap is int && request.resource.data.cap >= 2 && request.resource.data.cap <= 20
             && request.resource.data.cap >= resource.data.playerCount

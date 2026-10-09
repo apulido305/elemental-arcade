@@ -425,12 +425,15 @@ const ROOMS=[
   {id:'type',name:'Family Sort',glyph:'Fam',desc:'Sort cards into their families.',theme:'Alkali Metal',types:['type']},
   {id:'lab',name:'Particle Lab',glyph:'p n e',desc:'Count neutrons, electrons and atoms.',theme:'Nonmetal',types:['lab']},
   {id:'ion',name:'Ion Maker',glyph:'Na⁺',desc:'Valence electrons and the ion each element forms.',theme:'Cation',types:['ion']},
+  {id:'metal',name:'Metal Detector',glyph:'M/N',desc:'Find the metal, nonmetal or metalloid.',theme:'Post-Transition',types:['metal']},
   {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','shells','config','table','type','lab']}
 ];
 /* Why a room can be empty in a deck, and decks that fill it (shown when a locked room is tapped). */
-const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},ion:{needs:'main-group element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
+const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},ion:{needs:'main-group element cards',decks:['s20','e118']},metal:{needs:'element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
 /* Ion Maker: the one common ion of these main-group elements ("2−" = magnitude 2, negative). Anything else has no single common ion. */
 const ION_CHG={Li:'1+',Na:'1+',K:'1+',Rb:'1+',Cs:'1+',Be:'2+',Mg:'2+',Ca:'2+',Sr:'2+',Ba:'2+',Al:'3+',N:'3−',P:'3−',O:'2−',S:'2−',Se:'2−',F:'1−',Cl:'1−',Br:'1−',I:'1−'};
+/* Metal Detector: class from family. At, Ts and Z >= 104 are left out (classification unknown). */
+const klass=it=>{if(it.cat!=='el'||+it.zn>=104||it.sym==='At')return null;const f=it.family;return f==='Metalloid'?'metalloid':(f==='Nonmetal'||f==='Halogen'||f==='Noble Gas')?'nonmetal':'metal'};
 
 /* ---------- profile icons: 16 preset SVGs (design/ux-spec.md). Stored as an id string only, never markup. ---------- */
 const ICONS=[
@@ -800,6 +803,15 @@ const GEN={
     const opts=mkOpts(String(m),dist);if(!opts||opts.length<4)return null;
     return{prompt:'How many electrons does '+nm+' '+(pos?'lose':'gain')+' to form its ion?',clue,opts,exp:why};
   },
+  /* Metal Detector: 4 options, the answer is the card; decoys come from the other two classes, nearest in Z first. */
+  metal(it){
+    const cls=klass(it);if(!cls)return null;
+    const pool=dpool(it).filter(x=>x.id!==it.id&&klass(x)&&klass(x)!==cls);
+    const keys=pool.map(x=>[Math.abs(x.zn-it.zn)+rand()*6,x]).sort((a,b)=>a[0]-b[0]);
+    const opts=mkOpts(esc(it.name),keys.map(p=>esc(p[1].name)));if(!opts||opts.length<4)return null;
+    return{prompt:'Which one is a '+cls+'?',clue:'',opts,
+      exp:'<p><b>'+esc(it.name)+'</b> is a <b>'+cls+'</b> ('+esc(it.family.toLowerCase())+').</p>'};
+  },
 };
 /* Electrons per shell as numbers, or null (polyatomic ions have no shells; H+ has no electrons). */
 const shellsOf=it=>{const a=String(it.shells||'').split(',').map(s=>parseInt(s,10));return a.length&&a.every(n=>n>=0)&&a.some(n=>n>0)?a:null};
@@ -810,6 +822,7 @@ function supports(it,t){
     case 'shells':return !!shellsOf(it);
     case 'lab':return it.cat!=='el';
     case 'ion':return it.cat==='el'&&ION_CHG.hasOwnProperty(it.sym);
+    case 'metal':return it.cat==='el'&&!!klass(it);
     default:return true;
   }
 }
