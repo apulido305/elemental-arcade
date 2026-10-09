@@ -2,7 +2,7 @@
 import { test, expect } from '../helpers/fixtures.js';
 
 const DECKS = ['s20', 'r4', 'e118', 'cat', 'iso', 'all'];
-const ROOMS = ['mixed', 'ability', 'symbol', 'number', 'config', 'lab'];
+const ROOMS = ['mixed', 'ability', 'symbol', 'number', 'shells', 'config', 'lab'];
 const SEEDS = [1, 42, 123456789, 0xdeadbeef, 4294967295];
 
 test.describe('buildRound / makeQ', () => {

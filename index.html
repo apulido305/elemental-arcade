@@ -419,11 +419,12 @@ const ROOMS=[
   {id:'ability',name:'Ability Match',glyph:'Ab',desc:'Read the ability and name the card.',theme:'Alkaline Earth',types:['ability']},
   {id:'symbol',name:'Symbol Smash',glyph:'Au',desc:'Match symbols with names.',theme:'Halogen',types:['symbol']},
   {id:'number',name:'Number Crunch',glyph:'79',desc:'Atomic numbers, both directions.',theme:'Transition Metal',types:['number']},
-  {id:'config',name:'Orbital Builder',glyph:'1s²',desc:'Pick the right electron configuration.',theme:'Noble Gas',types:['config']},
+  {id:'shells',name:'Orbital Builder: HS',glyph:'n=2',desc:'Electrons in each shell: n=1, n=2, n=3.',theme:'Lanthanide',types:['shells']},
+  {id:'config',name:'Orbital Builder: College',glyph:'1s²',desc:'Pick the right electron configuration.',theme:'Noble Gas',types:['config']},
   {id:'table',name:'Table Map',glyph:'G·P',desc:'Find the group, period and state.',theme:'Metalloid',types:['table']},
   {id:'type',name:'Family Sort',glyph:'Fam',desc:'Sort cards into their families.',theme:'Alkali Metal',types:['type']},
   {id:'lab',name:'Particle Lab',glyph:'p n e',desc:'Count neutrons, electrons and atoms.',theme:'Nonmetal',types:['lab']},
-  {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','config','table','type','lab']}
+  {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','shells','config','table','type','lab']}
 ];
 /* Why a room can be empty in a deck, and decks that fill it (shown when a locked room is tapped). */
 const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
@@ -676,6 +677,25 @@ const GEN={
     return{prompt:pr,clue:tileScaled(it,{neutral:true}),opts,mono:true,
       exp:'<p><b>'+esc(it.name)+'</b>: <span style="font-family:var(--mono)">'+esc(it.config)+'</span>.'+tip+'</p>'};
   },
+  /* HS level of Orbital Builder: electrons per shell in n=1, n=2 ... notation (the College level is config above). */
+  shells(it){
+    const sh=shellsOf(it);if(!sh)return null;
+    const str=a=>a.map((n,i)=>'n='+(i+1)+': '+n).join(' · ');
+    const ok=str(sh);
+    // Typical slips: one electron too few in the last shell (spilled into a new one), or one moved between the last two.
+    const slips=[];
+    if(sh[sh.length-1]>1)slips.push(sh.slice(0,-1).concat([sh[sh.length-1]-1,1]));
+    if(sh.length>1&&sh[sh.length-2]>1)slips.push(sh.slice(0,-2).concat([sh[sh.length-2]-1,sh[sh.length-1]+1]));
+    const total=sh.reduce((a,b)=>a+b,0);
+    const near=dpool(it).concat(ALL.filter(x=>x.cat==='el'&&x.zn<=36)).map(shellsOf).filter(Boolean)
+      .map(a=>[Math.abs(a.reduce((x,y)=>x+y,0)-total)+rand()*4,str(a)]).sort((a,b)=>a[0]-b[0]).map(p=>p[1]);
+    const fits=a=>a.every((n,i)=>n<=2*(i+1)*(i+1));   // a shell n holds at most 2n² electrons: never offer an impossible one
+    const opts=mkOpts(ok,shuffle(slips.filter(fits)).slice(0,1).map(str).concat(near));if(!opts)return null;
+    const who=it.cat==='el'?esc(it.name):it.cat==='iso'?'a neutral '+esc(it.name)+' atom':'the '+esc(it.name);
+    const tip=it.cat==='cat'?' A cation lost electrons from its outer shell.':it.cat==='an'?' An anion gained electrons, so its outer shell fills up.':'';
+    return{prompt:'How are the electrons of '+who+' arranged in shells?',clue:tileScaled(it,{neutral:true,hide:{shells:true}}),opts,mono:true,
+      exp:'<p><b>'+esc(it.name)+'</b> has '+total+' electron'+(total===1?'':'s')+': <span style="font-family:var(--mono)">'+esc(ok)+'</span>.'+tip+'</p>'};
+  },
   table(it){
     const kinds=['group','period'];if(['Solid','Liquid','Gas'].includes(it.s3v))kinds.push('state');
     const k=kinds[rnd(kinds.length)];
@@ -739,10 +759,13 @@ const GEN={
       exp:'<p>'+why+'</p>'};
   }
 };
+/* Electrons per shell as numbers, or null (polyatomic ions have no shells; H+ has no electrons). */
+const shellsOf=it=>{const a=String(it.shells||'').split(',').map(s=>parseInt(s,10));return a.length&&a.every(n=>n>=0)&&a.some(n=>n>0)?a:null};
 function supports(it,t){
   switch(t){
     case 'number':case 'table':return it.cat==='el';
     case 'config':return !!it.config;
+    case 'shells':return !!shellsOf(it);
     case 'lab':return it.cat!=='el';
     default:return true;
   }

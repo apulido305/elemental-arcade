@@ -174,7 +174,7 @@ test('reduced motion: new UI (notice, sticky bars, picker, room stagger) does no
   const d2 = await arena.device({ width: PHONE }); await d2.goto('/');
   // (cloud-ready re-renders home right away, so measure the stagger rule itself on the current grid)
   const delays = await d2.page.evaluate(() => { document.querySelector('main').classList.add('enter'); document.querySelector('.rooms').classList.add('stag'); return [...document.querySelectorAll('.rooms.stag .room')].map(e => parseFloat(getComputedStyle(e).animationDelay) * 1000); });
-  expect(delays.length).toBe(8);
+  expect(delays.length).toBe(await d2.page.evaluate(() => Arcade.ROOMS.length));
   expect(Math.max(...delays)).toBeLessThanOrEqual(200);
   await d2.page.locator('[data-act="binder"]').click(); await d2.page.locator('[data-act="home"]').last().click();
   expect(await d2.page.evaluate(() => Arcade.V.screen)).toBe('home');
