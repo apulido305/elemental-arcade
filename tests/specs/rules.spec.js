@@ -2,6 +2,7 @@
 // Each rejection must surface as a FirebaseError with code 'permission-denied'.
 import { test, expect } from '../helpers/fixtures.js';
 import { expectDenied, expectCode, openLobby, signedKid, guest, toQuestion } from '../helpers/arena.js';
+import { T } from '../fake/backend.js';
 
 test.describe('rules: guests (anonymous)', () => {
   test('guest cannot list matches, signed-in classmate can list own class only', async ({ arena }) => {
@@ -13,10 +14,11 @@ test.describe('rules: guests (anonymous)', () => {
     expect((await kid.listLobby()).map(m => m.id)).toEqual([code]);
     expect(await other.listLobby()).toEqual([]);
     await expectDenied(other.listLobby({ cls: 'class1' }), "caller's cls");   // cannot peek at another class
-    // an unconstrained list is rejected even for signed-in users
+    // an unconstrained list is rejected even for signed-in users; a list pinned to your own class is allowed (cleanup sweep)
     const F = kid.F;
-    await expectDenied(F.getDocs(F.collection(kid.db, 'matches')), 'listed == true');
-    await expectDenied(F.getDocs(F.query(F.collection(kid.db, 'matches'), F.where('cls', '==', 'class1'))), 'listed == true');
+    await expectDenied(F.getDocs(F.collection(kid.db, 'matches')), "cls == caller's cls");
+    expect((await F.getDocs(F.query(F.collection(kid.db, 'matches'), F.where('cls', '==', 'class1')))).size).toBe(1);
+    await expectDenied(other.F.getDocs(other.F.query(other.F.collection(other.db, 'matches'), other.F.where('cls', '==', 'class1'))), "cls == caller's cls");
     expect(host.uid).toBeTruthy();
   });
 
@@ -524,12 +526,68 @@ test.describe('rules: lobby start timer', () => {
     });
     await expectDenied(join(a, { expireAt: at(30) }), 'now + 9..11 min');           // the 2nd joiner cannot buy 30 minutes
     await join(a, { expireAt: at(10) });                                              // the start timer begins
-    await expectDenied(join(b, { expireAt: at(10) }), 'now + 9..11 min');           // a 3rd joiner cannot restart it
+    await expectDenied(join(b, { expireAt: at(10.5) }), 'now + 9..11 min');         // a 3rd joiner cannot restart it
     await join(b);
     await expectDenied(leave(b, { expireAt: at(60) }), 'now + 9..11 min');          // 3 -> 2 keeps the running timer
     await leave(b);
     await leave(a, { expireAt: at(60) });                                             // back to the host alone: solo hold
     expect((await host.getMatch(code)).playerCount).toBe(1);
     await expectDenied(c.F.updateDoc(c.ref('matches', code), { expireAt: at(60) }));   // never without a seat change
+  });
+});
+
+test.describe('rules: cleanup of dead matches', () => {
+  // Seed a match and its children directly (as if written days ago), then try the sweep's writes as a classmate.
+  const seed = (arena, code, m, uids = []) => {
+    const now = arena.backend.now();
+    arena.backend.adminSet('matches/' + code, Object.assign({ hostUid: uids[0] || 'h', hostNick: 'host', cls: 'class1', deck: 's20', room: 'mixed', seed: 1, cap: 20, allowGuests: true, listed: true,
+      status: 'done', createdAt: T(now), expireAt: T(now + 600e3), playerCount: uids.length, startAt: T(now), alive: 0, aggUid: 'h', aggUntil: T(now), winnerUid: null, endedAt: T(now), rematch: null }, m));
+    for (const u of uids) {
+      arena.backend.adminSet(`matches/${code}/players/${u}`, { nick: u, guest: false, joinedAt: T(now), lastSeen: T(now), score: 100, correct: 1, totalMs: 1, answeredQ: 0, reaction: null, reactionAt: null, abandoned: false, left: false, streak: 1 });
+      arena.backend.adminSet(`matches/${code}/answers/${u}_0`, { q: 0, choice: 0, elapsedMs: 1, correct: true, points: 100, at: T(now) });
+      arena.backend.adminSet(`matches/${code}/presence/${u}`, { at: T(now) });
+    }
+  };
+  const DAY = 24 * 3600e3;
+
+  test('a match that ended over a day ago can be deleted with its seats, answers and heartbeats; nothing live can', async ({ arena }) => {
+    const kid = await signedKid(arena, 'kid'), g = await guest(arena), F = kid.F, now = arena.backend.now();
+    seed(arena, 'DEADAA', { createdAt: T(now - DAY - 60e3) }, ['u1', 'u2']);
+    seed(arena, 'FRESHA', { createdAt: T(now - DAY + 60e3) }, ['u3']);                      // ended, but less than a day old
+    seed(arena, 'LIVEAA', { status: 'lobby', createdAt: T(now - 2 * DAY) }, ['u4']);           // old, but still a lobby
+    seed(arena, 'PLAYAA', { status: 'playing', createdAt: T(now - 2 * DAY) }, ['u5']);
+    const del = (...p) => F.deleteDoc(kid.ref(...p));
+    // the sweep can list a dead match's seats, not a live one's
+    expect((await F.getDocs(F.collection(kid.db, 'matches', 'DEADAA', 'players'))).size).toBe(2);
+    await expectDenied(F.getDocs(F.collection(kid.db, 'matches', 'LIVEAA', 'players')), 'cleanup');
+    // nothing live, or ended less than a day ago, can be deleted
+    for (const c of ['FRESHA', 'LIVEAA', 'PLAYAA']) {
+      await expectDenied(del('matches', c), 'dead');
+      await expectDenied(del('matches', c, 'players', ['u3', 'u4', 'u5'][['FRESHA', 'LIVEAA', 'PLAYAA'].indexOf(c)]), 'cleanup');
+    }
+    await expectDenied(del('matches', 'LIVEAA', 'answers', 'u4_0'), 'cleanup');
+    await expectDenied(del('matches', 'LIVEAA', 'presence', 'u4'), 'cleanup');
+    // guests never clean up
+    await expectDenied(g.F.deleteDoc(g.ref('matches', 'DEADAA', 'answers', 'u1_0')), 'cleanup');
+    // a classmate deletes the dead one: children, then the match
+    for (const u of ['u1', 'u2']) { await del('matches', 'DEADAA', 'answers', u + '_0'); await del('matches', 'DEADAA', 'presence', u); await del('matches', 'DEADAA', 'players', u); }
+    await del('matches', 'DEADAA');
+    expect(arena.backend.adminGet('matches/DEADAA')).toBeNull();
+    expect(arena.backend.adminList('matches/DEADAA/players')).toEqual([]);
+    // leftovers under a match that is already gone may also be deleted
+    arena.backend.adminSet('matches/GONEAA/answers/u9_0', { q: 0 });
+    await del('matches', 'GONEAA', 'answers', 'u9_0');
+  });
+
+  test('a match stuck in playing can be ended by any account an hour after it started, not before; never by a guest', async ({ arena }) => {
+    const kid = await signedKid(arena, 'kid'), g = await guest(arena), now = arena.backend.now();
+    seed(arena, 'STUCKA', { status: 'playing', startAt: T(now - 3600e3 - 60e3), endedAt: null });
+    seed(arena, 'RECENT', { status: 'playing', startAt: T(now - 3000e3), endedAt: null });
+    const end = (cl, c) => cl.F.updateDoc(cl.ref('matches', c), { status: 'abandoned', endedAt: cl.F.serverTimestamp() });
+    await expectDenied(end(kid, 'RECENT'));
+    await expectDenied(end(g, 'STUCKA'));
+    await expectDenied(kid.F.updateDoc(kid.ref('matches', 'STUCKA'), { status: 'done', endedAt: kid.F.serverTimestamp() }));
+    await end(kid, 'STUCKA');
+    expect(arena.backend.adminGet('matches/STUCKA').status).toBe('abandoned');
   });
 });

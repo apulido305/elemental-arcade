@@ -49,7 +49,7 @@ One signed-in student hosts, picks a deck and room, and puts a 6-character code 
 
 - **Cheating:** correctness and timing are computed in each student's browser, so a determined student can cheat. The 8-second late window for slow connections means a student who edits the page could also answer during the reveal. The rules stop obvious abuse (bad shapes, impossible scores, writing as someone else) but cannot prove an answer was honest.
 - **Abuse limits:** Auth sign-in rate limits can be tightened in the Firebase console. Turn on App Check if abuse appears.
-- **Cleanup (optional):** add a Firestore TTL policy on the `expireAt` field of `matches` to auto-delete old lobbies. Expired lobbies are only marked `expired`, never deleted by the app.
+- **Cleanup (built in, free plan):** when a signed-in student opens VS Arena, their phone (at most every 6 hours) sweeps their own class's arenas: lobbies whose timer ran out are marked expired, matches stuck mid-game for an hour are ended, and matches that ended more than a day ago are deleted along with every seat, answer and heartbeat under them. The rules allow this only for matches that are provably over. A host who closes the tab also takes their lobby off the class lobby list. Do not add a Firestore TTL policy on `expireAt`: TTL needs billing, does not delete subcollections, and `expireAt` passes while a match is still being played.
 - **After an update, everyone refresh the page before joining an arena.** Questions are built from the match seed, so a phone with an old cached page can see different questions from a phone with the new one.
 - Privacy: students and guests appear by nickname only. Guest names are generated (for example "Bold Boron"). Reactions are 5 presets. There is no chat.
 

@@ -373,6 +373,7 @@ function renderLobbyList() {
 function watchLobby() {
   stopLobby();
   const acct = C.account(); if (!acct) return;
+  sweep();   // background cleanup of this class's dead arenas (throttled; never blocks the menu)
   const F = fb.F, db = fb.db;
   try {
     const q = F.query(F.collection(db, 'matches'), F.where('listed', '==', true), F.where('status', '==', 'lobby'), F.where('cls', '==', acct.cls), F.limit(20));
@@ -383,6 +384,53 @@ function watchLobby() {
     };
     unsubLobby = F.onSnapshot(q, apply, () => { ui.lobby = []; renderLobbyList(); });
   } catch (e) { ui.lobby = []; }
+}
+/* ---------- cleanup: ghost lobbies and old matches ----------
+   Firestore TTL needs a paid plan and never deletes subcollections, so each class cleans up after itself. When a
+   signed-in student opens VS Arena, their phone (at most every 6 hours) reads its own class's matches and:
+   1. marks unlisted lobbies whose timer ran out 'expired' (listed ones are expired by the class lobby listener),
+   2. ends matches still 'playing' an hour after they started (everyone closed the tab): 'abandoned',
+   3. deletes matches that ended more than a day ago, with every seat, answer and heartbeat under them.
+   The rules allow each step only on a match that is provably dead, so a sweep can never touch a live arena.
+   A day's grace keeps results, rematch banners and reloads working. Failures are silent: another phone will retry. */
+const DEAD_BASE = 24 * 60 * 60 * 1000, STUCK_BASE = 60 * 60 * 1000, SLACK_BASE = 5 * 60 * 1000;   // scaled by TS() in tests
+const SWEEP_EVERY = 6 * 60 * 60 * 1000, SWEEP_MAX = 5, SWEEP_KEY = 'ea-vs-sweep';                 // real time, per device
+let swept = false;
+const DEAD = ['expired', 'done', 'abandoned'];
+const isDead = (d, now) => DEAD.includes(d.status) && now - toMs(d.createdAt) > (DEAD_BASE + SLACK_BASE) * TS();
+async function sweep(force) {
+  const acct = C.account(); if (!acct || (swept && !force)) return null;
+  swept = true;
+  try {
+    if (!force && Date.now() - (+localStorage.getItem(SWEEP_KEY) || 0) < SWEEP_EVERY) return null;
+    localStorage.setItem(SWEEP_KEY, String(Date.now()));
+  } catch (e) { /* storage blocked: sweep anyway, once per page load */ }
+  const F = fb.F, db = fb.db, now = Date.now(), out = { expired: 0, ended: 0, deleted: 0 };
+  let snap;
+  try { snap = await F.getDocs(F.query(F.collection(db, 'matches'), F.where('cls', '==', acct.cls), F.limit(100))); } catch (e) { return out; }
+  const rows = []; snap.forEach(d => rows.push(Object.assign({ code: d.id }, d.data())));
+  for (const d of rows) {
+    const mref = F.doc(db, 'matches', d.code);
+    try {
+      // Listed lobbies are already expired by the class lobby listener (watchLobby); the sweep takes the unlisted ones.
+      if (d.status === 'lobby' && !d.listed && toMs(d.expireAt) && toMs(d.expireAt) < now) { await F.updateDoc(mref, { status: 'expired' }); out.expired++; }
+      else if (d.status === 'playing' && toMs(d.startAt) && now - toMs(d.startAt) > (STUCK_BASE + SLACK_BASE) * TS()) { await F.updateDoc(mref, { status: 'abandoned', endedAt: F.serverTimestamp() }); out.ended++; }
+      else if (out.deleted < SWEEP_MAX && isDead(d, now)) { await purge(d); out.deleted++; }
+    } catch (e) { /* another phone got there first, or the rules said no: skip it */ }
+  }
+  return out;
+}
+// Delete one dead match: children first, the match doc last (the rules read the match to know its children are dead).
+// Answer ids are {uid}_{q}, so they come from the seat list; deleting one that was never written is harmless.
+async function purge(d) {
+  const F = fb.F, db = fb.db, n = qnOk(d.qn), refs = [];
+  const seats = await F.getDocs(F.collection(db, 'matches', d.code, 'players'));
+  seats.forEach(s => {
+    refs.push(F.doc(db, 'matches', d.code, 'players', s.id), F.doc(db, 'matches', d.code, 'presence', s.id));
+    for (let q = 0; q < n; q++) refs.push(F.doc(db, 'matches', d.code, 'answers', s.id + '_' + q));
+  });
+  for (let i = 0; i < refs.length; i += 400) { const b = F.writeBatch(db); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
+  await F.deleteDoc(F.doc(db, 'matches', d.code));
 }
 function stopLobby() { if (unsubLobby) { try { unsubLobby(); } catch (e) { /* ignore */ } unsubLobby = null; } }
 
@@ -746,10 +794,14 @@ function onPageHide() {
   if (!R || !R.match || (R.view !== 'lobby' && R.view !== 'play')) return;
   R.left = true;
   try { fb.F.updateDoc(R.pref, { left: true }).catch(() => {}); } catch (e) { /* best effort */ }
+  // A host closing the tab takes the arena off the class lobby list; otherwise it sits there as a ghost until its
+  // timer runs out. Coming back to the tab (phones restore pages) lists it again.
+  if (R.view === 'lobby' && isHost() && R.match.listed) { R.relist = true; try { fb.F.updateDoc(R.mref, { listed: false }).catch(() => {}); } catch (e) { /* best effort */ } }
 }
 function onPageShow() {
   if (!R || !R.left || (R.view !== 'lobby' && R.view !== 'play') || (R.players[R.uid] && R.players[R.uid].abandoned)) return;
   R.left = false; try { fb.F.updateDoc(R.pref, { left: false }).catch(() => {}); } catch (e) { /* ignore */ }
+  if (R.relist && R.view === 'lobby') { R.relist = false; try { fb.F.updateDoc(R.mref, { listed: true }).catch(() => {}); } catch (e) { /* ignore */ } }
 }
 
 /* ---------- play: clock ---------- */
@@ -1255,7 +1307,7 @@ function goneHTML() {
 }
 
 /* ---------- boot ---------- */
-window.VSArena = { open, _rank: rankPlayers, _scoreAnswer: scoreAnswer, _phaseAt: phaseAt };
+window.VSArena = { open, _rank: rankPlayers, _scoreAnswer: scoreAnswer, _phaseAt: phaseAt, _sweep: sweep };
 
 function boot() {
   try {

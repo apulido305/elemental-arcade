@@ -70,6 +70,12 @@ const isParticipant = c => c.signedIn && c.exists(seatPath(c, c.uid));
 const matchStatus = c => (c.get(matchPath(c)) || {}).status;
 const ownPlayerDoc = c => c.get('players/' + c.uid);
 const participantClause = ['participant', c => isParticipant(c)];
+// Cleanup: dead = ended (expired, done, abandoned) and created more than a day ago (scaled). deadOrGone also covers
+// children of a match that no longer exists.
+const DAY = 24 * 60 * 60 * 1000;
+const deadMatch = (c, m) => !!m && ['expired', 'done', 'abandoned'].includes(m.status) && c.time > ms(m.createdAt) + DAY * c.ts;
+const deadOrGone = c => !c.exists(matchPath(c)) || deadMatch(c, c.get(matchPath(c)));
+const cleanupClause = ['cleanup: account, and the match is dead (ended, > 1 day old) or gone', c => c.signedIn && !c.anon && deadOrGone(c)];
 
 // ---- matches/{code} ----
 const matchCreate = [
@@ -135,6 +141,12 @@ const matchUpdate = [
     ['alive: account only, int 0..20', c => !has(c, 'alive') || (!c.anon && intIn(c.inc.alive, 0, MAX_CAP))],
     ['aggUid: account only, self, previous lease expired', c => !has(c, 'aggUid') || (!c.anon && c.inc.aggUid === c.uid && ms(c.res.aggUntil) < c.time)],
     ['aggUntil: account only, self is aggUid, within 2 min', c => !has(c, 'aggUntil') || (!c.anon && c.inc.aggUid === c.uid && isTs(c.inc.aggUntil) && ms(c.inc.aggUntil) <= c.time + 120000 * c.ts)]),
+  alt('7. cleanup: any account ends a match stuck in playing an hour after it started',
+    signedIn, notAnon,
+    ["res.status == 'playing'", c => c.res.status === 'playing'],
+    ['request.time > startAt + 1 h', c => isTs(c.res.startAt) && c.time > ms(c.res.startAt) + 60 * MIN * c.ts],
+    ['only status and endedAt change', c => subset(c.changed, ['status', 'endedAt'])],
+    ["status becomes 'abandoned', endedAt == request.time", c => c.inc.status === 'abandoned' && ms(c.inc.endedAt) === c.time]),
   alt('6. seat count +1 / -1 together with own seat create / delete (lobby only)',
     signedIn,
     ['lobby before and after', c => c.res.status === 'lobby' && c.inc.status === 'lobby'],
@@ -238,29 +250,31 @@ export const RULES = [
     path: 'matches/{code}',
     get: [signedIn],
     list: [signedIn, notAnon,
-      ['query pins listed == true', c => c.q.wheres.some(w => w.field === 'listed' && w.op === '==' && w.value === true)],
-      ["query pins status == 'lobby'", c => c.q.wheres.some(w => w.field === 'status' && w.op === '==' && w.value === 'lobby')],
-      ["query pins cls == caller's cls", c => { const p = ownPlayerDoc(c); return !!p && c.q.wheres.some(w => w.field === 'cls' && w.op === '==' && w.value === p.cls); }]],
+      ["query pins cls == caller's cls (class lobby and cleanup sweep)", c => { const p = ownPlayerDoc(c); return !!p && c.q.wheres.some(w => w.field === 'cls' && w.op === '==' && w.value === p.cls); }]],
     create: matchCreate,
-    update: matchUpdate
+    update: matchUpdate,
+    delete: [signedIn, notAnon, ['cleanup: the match is dead (ended, > 1 day old)', c => deadMatch(c, c.res)]]
   },
   {
     path: 'matches/{code}/players/{pid}',
     get: [signedIn, ['participant, or reading own (maybe missing) seat', c => c.params.pid === c.uid || isParticipant(c)]],
-    list: [signedIn, participantClause],
+    list: [alt('participant', signedIn, participantClause), alt('cleanup', cleanupClause)],
     create: [seatCreateHost, seatCreateJoin],
     update: [seatUpdateSelf, seatMarkAbandoned],
-    delete: [signedIn, ['pid == uid', c => c.params.pid === c.uid], ["match is in 'lobby'", c => matchStatus(c) === 'lobby']]
+    delete: [alt('own seat in the lobby', signedIn, ['pid == uid', c => c.params.pid === c.uid], ["match is in 'lobby'", c => matchStatus(c) === 'lobby']),
+      alt('cleanup', cleanupClause)]
   },
   {
     path: 'matches/{code}/answers/{aid}',
     get: [signedIn, ['owner only ({uid}_{q})', c => c.params.aid.split('_')[0] === c.uid]],
-    create: answerCreate
+    create: answerCreate,
+    delete: [cleanupClause]
   },
   {
     path: 'matches/{code}/presence/{pid}',
     get: [signedIn, participantClause], list: [signedIn, participantClause],
-    create: presenceWrite, update: presenceWrite
+    create: presenceWrite, update: presenceWrite,
+    delete: [cleanupClause]
   }
 ];
 
