@@ -313,7 +313,7 @@ function menuHTML() {
   const acct = C.account();
   const f = ui.form;
   const decks = Arc.DECKS.map(d => '<option value="' + d.id + '"' + (d.id === f.deck ? ' selected' : '') + '>' + esc(d.name) + ' (' + esc(d.sub) + ')</option>').join('');
-  const rooms = Arc.ROOMS.map(r => '<option value="' + r.id + '"' + (r.id === f.room ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('');
+  const rooms = Arc.ROOMS.filter(r => !r.solo).map(r => '<option value="' + r.id + '"' + (r.id === f.room ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('');
   const host = acct
     ? '<div class="vs-panel"><h2>Host an arena</h2><p class="vs-sub">Pick the deck and room. Everyone gets the same 10 questions.</p>' +
       '<div class="vs-row2" style="margin-top:12px"><div class="vs-f"><label for="vs-deck">Deck</label><select id="vs-deck" data-vs="deck">' + decks + '</select></div>' +

@@ -208,7 +208,7 @@ h1,h2,h3{margin:0;font-weight:400}
 @keyframes pulse{50%{transform:scale(1.2)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 main.enter>*{animation:fadeIn .3s backwards}
-.enter .rooms.stag .room{animation:fadeIn .3s backwards;animation-delay:calc(var(--i,0)*25ms)}
+.enter .rooms.stag .room{animation:fadeIn .3s backwards;animation-delay:calc(min(var(--i,0),8)*25ms)}
 .enter .cell,.enter .slot{animation:fadeIn .35s backwards;animation-delay:calc(var(--i,0)*14ms)}
 .enter .flip{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) backwards;animation-delay:calc(var(--i,0)*.12s + .35s)}
 .enter .stat{animation:rise .4s backwards}
@@ -424,10 +424,17 @@ const ROOMS=[
   {id:'table',name:'Table Map',glyph:'G·P',desc:'Find the group, period and state.',theme:'Metalloid',types:['table']},
   {id:'type',name:'Family Sort',glyph:'Fam',desc:'Sort cards into their families.',theme:'Alkali Metal',types:['type']},
   {id:'lab',name:'Particle Lab',glyph:'p n e',desc:'Count neutrons, electrons and atoms.',theme:'Nonmetal',types:['lab']},
+  {id:'ion',name:'Ion Maker',glyph:'Na⁺',desc:'Valence electrons and ions.',theme:'Cation',types:['ion']},
+  {id:'metal',name:'Metal Detector',glyph:'M/N',desc:'Find the metal, nonmetal or metalloid.',theme:'Post-Transition',types:['metal']},
+  {id:'review',name:'Review Room',glyph:'Rev',desc:'Replay the cards you missed.',theme:'Actinide',types:['review'],solo:true},
   {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','shells','config','table','type','lab']}
 ];
 /* Why a room can be empty in a deck, and decks that fill it (shown when a locked room is tapped). */
-const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
+const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},ion:{needs:'main-group element cards',decks:['s20','e118']},metal:{needs:'element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
+/* Ion Maker: the one common ion of these main-group elements ("2−" = magnitude 2, negative). Anything else has no single common ion. */
+const ION_CHG={Li:'1+',Na:'1+',K:'1+',Rb:'1+',Cs:'1+',Be:'2+',Mg:'2+',Ca:'2+',Sr:'2+',Ba:'2+',Al:'3+',N:'3−',P:'3−',O:'2−',S:'2−',Se:'2−',F:'1−',Cl:'1−',Br:'1−',I:'1−'};
+/* Metal Detector: class from family. At, Ts and Z >= 104 are left out (classification unknown). */
+const klass=it=>{if(it.cat!=='el'||+it.zn>=104||it.sym==='At')return null;const f=it.family;return f==='Metalloid'?'metalloid':(f==='Nonmetal'||f==='Halogen'||f==='Noble Gas')?'nonmetal':'metal'};
 
 /* ---------- profile icons: 16 preset SVGs (design/ux-spec.md). Stored as an id string only, never markup. ---------- */
 const ICONS=[
@@ -774,6 +781,47 @@ const GEN={
     }
     return{prompt:'How many '+target+' does '+esc(it.name)+' have?',clue:tileScaled(it,{neutral:true}),opts:numOpts(ans,0,160),
       exp:'<p>'+why+'</p>'};
+  },
+  /* Ion Maker: valence electrons and the common ion of a main-group element (ION_CHG). Seeded helpers only. */
+  ion(it){
+    const ch=ION_CHG[it.sym];if(!ch)return null;
+    const g=+it.s1v,v=g<=2?g:g-10,m=+ch[0],pos=ch[1]==='+',m2=8-m;
+    const sup=(n,p)=>'<sup>'+(n>1?n:'')+(p?'+':'−')+'</sup>',ion=(n,p)=>esc(it.sym)+sup(n,p);
+    const nm=esc(it.name),k=rnd(3);
+    const why='<p><b>'+nm+'</b> is in group '+g+', so it has <b>'+v+'</b> valence electron'+(v===1?'':'s')+'. It '+(pos?'loses '+m+', leaving a full outer shell':'gains '+m+' to reach 8')+', making <b>'+ion(m,pos)+'</b>.</p>';
+    const clue=tileScaled(it,{neutral:true,hide:{shells:true,post:true}});
+    if(k===0){
+      const extra=shuffle([8,2,v+1,v-1,v+2,4]);
+      const dist=[g,8-v].concat(extra).filter(n=>n>=1&&n!==v).map(String);
+      const opts=mkOpts(String(v),dist);if(!opts||opts.length<4)return null;
+      return{prompt:'How many valence electrons does '+nm+' have?',clue,opts,exp:why};
+    }
+    if(k===1){
+      const opts=mkOpts(ion(m,pos),[ion(m,!pos),ion(m2,pos),ion(m2,!pos)]);if(!opts||opts.length<4)return null;
+      return{prompt:'What ion does '+nm+' usually form?',clue,opts,exp:why};
+    }
+    const dist=[8-m,g,m+1,m-1].concat(shuffle([1,2,3,4,5,6,7,8])).filter(n=>n>=1&&n!==m).map(String);
+    const opts=mkOpts(String(m),dist);if(!opts||opts.length<4)return null;
+    return{prompt:'How many electrons does '+nm+' '+(pos?'lose':'gain')+' to form its ion?',clue,opts,exp:why};
+  },
+  /* Metal Detector: 4 options, the answer is the card; decoys come from the other two classes, nearest in Z first. */
+  metal(it){
+    const cls=klass(it);if(!cls)return null;
+    const other=x=>x.id!==it.id&&klass(x)&&klass(x)!==cls;
+    const inDeck=dpool(it).filter(other);   // decks with few other-class cards (Row 6, Row 7) borrow decoys from all elements
+    const pool=inDeck.length>=3?inDeck:inDeck.concat(ALL.filter(x=>other(x)&&!inDeck.includes(x)));
+    const keys=pool.map(x=>[Math.abs(x.zn-it.zn)+rand()*6,x]).sort((a,b)=>a[0]-b[0]);
+    const opts=mkOpts(esc(it.name),keys.map(p=>esc(p[1].name)));if(!opts||opts.length<4)return null;
+    return{prompt:'Which one is a '+cls+'?',clue:'',opts,
+      exp:'<p><b>'+esc(it.name)+'</b> is a <b>'+cls+'</b> ('+esc(it.family.toLowerCase())+').</p>'};
+  },
+  /* Review Room: a missed card in any question type it supports. The only generator that reads S (through supports), so solo only. */
+  review(it){
+    const ts=['ability','symbol','number','config','table','type','lab'].filter(t=>supports(it,t));
+    if(!ts.length)return null;
+    const k=rnd(ts.length);
+    for(let i=0;i<ts.length;i++){let q=null;try{q=GEN[ts[(k+i)%ts.length]](it)}catch(e){q=null}if(q)return q}
+    return null;
   }
 };
 /* Electrons per shell as numbers, or null (polyatomic ions have no shells; H+ has no electrons). */
@@ -784,6 +832,9 @@ function supports(it,t){
     case 'config':return !!it.config;
     case 'shells':return !!shellsOf(it);
     case 'lab':return it.cat!=='el';
+    case 'ion':return it.cat==='el'&&ION_CHG.hasOwnProperty(it.sym);
+    case 'metal':return it.cat==='el'&&!!klass(it);
+    case 'review':return (S.miss[it.id]||0)>0;   // reads S: solo only, never built for VS
     default:return true;
   }
 }
@@ -799,6 +850,7 @@ function makeQ(it,room,rng){
    Samples without replacement; repeats a card only when the pool has fewer than 10. */
 function buildRound(deckId,roomId,seed){
   const room=roomOf(roomId);const rng=mulberry32(seed);
+  if(room.solo)return [];   // Review Room reads S.miss: never part of a shared seeded round
   const prevDeck=QDECK;QDECK=deckId;
   try{
     const pool=roomPool(room,deckId);if(!pool.length)return [];
@@ -819,13 +871,16 @@ const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBus
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
 const roomPool=(room,deckId)=>deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t)));
+/* How many cards a room can use in a deck; the Review Room stays locked until at least 3 cards have been missed. */
+const roomN=(room,deckId)=>{const n=roomPool(room,deckId).length;return room.id==='review'&&n<3?0:n};
 
 function startRound(roomId){
   const room=roomOf(roomId);const pool=roomPool(room,S.deck);
-  if(!pool.length)return;
+  if(!roomN(room,S.deck))return;
   V.deckId=S.deck;
-  const n=Math.min(10,Math.max(5,pool.length));
+  const n=roomId==='review'?Math.min(10,pool.length):Math.min(10,Math.max(5,pool.length));
   const picks=[];let bag=pool.slice();
+  if(roomId==='review')picks.push(...pool.slice().sort((a,b)=>S.miss[b.id]-S.miss[a.id]).slice(0,n));   // most-missed first
   while(picks.length<n){
     if(!bag.length)bag=pool.slice();
     const w=bag.map(it=>!S.owned[it.id]?3:(S.miss[it.id]?2:1));
@@ -849,6 +904,7 @@ function answer(i){
     const t0=tierOf(before),t1=tierOf(before+1);V.lastUp=(t0>=0&&t1>t0)?t1:-1;
     {const bt=nextTier(before),bp=prevAt(before);V.cardFrom=V.lastUp>=0?0:(bt?Math.round((before-bp)/(bt.at-bp)*100):100)}
     V.fx=V.lastUp>=0?'level':'ok';
+    if(V.roomId==='review'&&S.miss[q.item.id]){S.miss[q.item.id]--;if(S.miss[q.item.id]<=0)delete S.miss[q.item.id]}   // Review Room: each right answer clears one miss
     if(V.lastNew)V.newIds.push(q.item.id);
     if(V.lastUp>=0)V.ups.push({id:q.item.id,tier:V.lastUp});
     tone(V.lastUp>=0?'level':'ok');
@@ -905,20 +961,20 @@ function vsHTML(){
   return '';
 }
 /* The room Play now uses: the remembered one if this deck can fill it, else Mixed Pack. */
-const playRoom=()=>{const r=roomOf(S.room);return r&&roomPool(r,S.deck).length?r:roomOf('mixed')};
-const lockedMsg=r=>{const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
+const playRoom=()=>{const r=roomOf(S.room);return r&&roomN(r,S.deck)?r:roomOf('mixed')};
+const lockedMsg=r=>{if(r.id==='review')return roomPool(r,S.deck).length?'The Review Room opens when you have missed 3 cards.':'No misses yet. Nice.';const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
 let HOMESEEN=false;
 function homeHTML(){
   const deck=DECKS.find(d=>d.id===S.deck);const pr=playRoom();
   const chips=DECKS.map(d=>{const it=deckItems(d.id);return '<button class="deck'+(d.id===S.deck?' on':'')+'" data-act="deck" data-id="'+d.id+'" aria-pressed="'+(d.id===S.deck)+'"><b>'+d.name+'</b><span>'+d.sub+'</span><em>'+ownedCount(it)+'/'+it.length+' cards</em></button>'}).join('');
-  const list=ROOMS.map(r=>({r,n:roomPool(r,S.deck).length}));
+  const list=ROOMS.map(r=>({r,n:roomN(r,S.deck)}));
   const rooms=list.filter(x=>x.n).concat(list.filter(x=>!x.n)).map(({r,n},ri)=>{
     const c=THEMES[r.theme];const st=S.stars[r.id+'|'+S.deck]||0;const mixed=r.id==='mixed';
     const band=mixed?'linear-gradient(135deg,var(--goldd),var(--gold))':'linear-gradient(135deg,'+c.dark+','+c.mid+')';
     const need=ROOM_NEEDS[r.id];
     return '<button class="room'+(mixed?' mixed':'')+'" style="--i:'+ri+'" data-act="room" data-id="'+r.id+'"'+(n?'':' aria-disabled="true"')+'>'+
       '<div class="band"'+(n?' style="background:'+band+'"':'')+'><span class="glyph">'+(n?r.glyph:lockSVG)+'</span>'+(n?starsHTML(st):'')+'</div>'+
-      '<div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Locked: needs '+(need?need.needs:'other cards')+'.')+'</span></div></button>';
+      '<div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Locked: needs '+(need?need.needs:r.id==='review'?'3 missed cards':'other cards')+'.')+'</span></div></button>';
   }).join('');
   const stag=!HOMESEEN;HOMESEEN=true;
   return noticeHTML()+vsHTML()+
@@ -1110,7 +1166,7 @@ app.addEventListener('click',e=>{
   else if(a==='signout'){Cloud.signOut()}
   else if(a==='vs'){if(window.VSArena)window.VSArena.open()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
-  else if(a==='again')startRound(V.roomId);
+  else if(a==='again'){const r=roomOf(V.roomId);if(r&&!roomN(r,S.deck)){V.roomMsg=lockedMsg(r);V.anim='screen';V.screen='home';V.modal=null;render();window.scrollTo(0,0)}else startRound(V.roomId)}   // a Review round can clear its own pool
   else if(a==='open'){V.modal=id;render()}
   else if(a==='flip'){V.flipped[id]=!V.flipped[id];tone('flip');t.classList.toggle('on',!!V.flipped[id])}
   else if(a==='flipall'){V.newIds.forEach(i=>V.flipped[i]=true);tone('flip');app.querySelectorAll('.flip').forEach(b=>b.classList.add('on'))}
@@ -1203,7 +1259,7 @@ render();
 </script>
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
-<script type="module" src="cloud.js?v=3"></script>
-<script type="module" src="vs.js?v=3"></script>
+<script type="module" src="cloud.js?v=4"></script>
+<script type="module" src="vs.js?v=4"></script>
 </body>
 </html>
