@@ -669,7 +669,8 @@ const GEN={
       return{prompt:'What shape does the '+esc(it.name)+' have?',clue:tileScaled(it,{neutral:true}),opts,
         exp:'<p>The <b>'+esc(it.name)+'</b> is <b>'+esc(it.config.toLowerCase())+'</b>.</p>'};
     }
-    const cand=dpool(it).concat(ALL.filter(x=>x.cat==='el'&&x.zn<=36)).filter(x=>x.config&&x.config!==it.config);
+    const core=c=>c.charAt(0)==='[';   // decoys must use the answer's notation (core "[Ar] ..." or full "1s² ...")
+    const cand=dpool(it).concat(ALL.filter(x=>x.cat==='el'&&x.zn<=86)).filter(x=>x.config&&x.config!==it.config&&core(x.config)===core(it.config));
     const sorted=cand.map(x=>[Math.abs(x.zn-it.zn)+rand()*5,x]).sort((a,b)=>a[0]-b[0]).map(p=>esc(p[1].config));
     const opts=mkOpts(esc(it.config),sorted);if(!opts)return null;
     const pr=it.cat==='el'?'Which electron configuration belongs to '+esc(it.name)+'?':it.cat==='iso'?'Which electron configuration does a neutral '+esc(it.name)+' atom have?':'Which electron configuration does the '+esc(it.name)+' have?';
