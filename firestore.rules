@@ -26,15 +26,22 @@ service cloud.firestore {
 
     function codeOk(code) { return code.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$'); }
 
+    // Profile icons are preset ids (the 16 in index.html ICONS), never markup. Optional on every doc that has one.
+    function iconOk(d) {
+      return !('icon' in d) || d.icon in ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon',
+                                          'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
+    }
+
     // ---------------------------------------------------------------------------------------------
     // /players/{uid}: each signed-in student reads and writes only their own save.
     // Anonymous guests never read or write here (guests have no stored progress).
-    // Progress may carry the VS record (vs) and the time it was last written (vsAt).
+    // Progress may carry the VS record (vs) and the time it was last written (vsAt). icon is the profile icon id.
     // ---------------------------------------------------------------------------------------------
     match /players/{uid} {
       allow read: if isAccount() && request.auth.uid == uid;
       allow create, update: if isAccount() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['progress', 'nick', 'cls', 'updated'])
+        && request.resource.data.keys().hasOnly(['progress', 'nick', 'cls', 'icon', 'updated'])
+        && iconOk(request.resource.data)
         && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt'])
         && (!('vs' in request.resource.data.progress)
             || (request.resource.data.progress.vs is map
@@ -190,12 +197,14 @@ service cloud.firestore {
         allow read: if signedIn() && (request.auth.uid == uid || isParticipant(code));
 
         // Join (or host's first seat). Only for yourself, only with this exact field set and starting values.
+        // icon is optional (older clients leave it out) and must be one of the preset ids.
         // Guests: guest == true is forced by provider, and they need allowGuests on the match.
         // Accounts: nick must be the nickname in their own /players doc. Guests: a generated name only.
         allow create: if signedIn()
           && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
-               'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+               'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
+          && iconOk(request.resource.data)
           && request.resource.data.keys().hasAll(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
                'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
           && request.resource.data.guest == isAnon()
@@ -231,12 +240,14 @@ service cloud.firestore {
         allow update: if
           // Your own row: anything except identity fields. answeredQ only goes up. Score only grows, by at
           // most one answer's worth per write, and stays within the maximum for ten questions.
+          // Only you can change your own icon, and only to a preset id.
           (signedIn()
             && request.auth.uid == uid
             && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
-                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
+            && iconOk(request.resource.data)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'score', 'correct', 'totalMs',
-                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
+                 'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
             && request.resource.data.answeredQ >= resource.data.answeredQ
             && request.resource.data.answeredQ <= 9
             // Once marked abandoned, you stay abandoned (no rejoining that match).

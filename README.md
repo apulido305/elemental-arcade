@@ -25,6 +25,10 @@ Students enter a class code, a nickname and a 4 to 6 digit PIN. The game turns t
 - There is no PIN reset. To let a student start over, delete their user under Authentication > Users and their document under Firestore > players.
 - Tell students to use a nickname, not their real name.
 
+## Profile icons
+
+Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon button next to their level. There is no upload, drawing or free text, and only the icon's id is stored, never an image. Guests keep theirs in this browser only; signed-in students keep theirs on their player document (`icon` next to `nick`), so it follows them to any device. In VS Arena the icon is copied onto the student's seat in the match so classmates can see it; the rules accept only the 16 ids.
+
 ## VS Arena (live multiplayer, 2 to 20 players)
 
 One signed-in student hosts, picks a deck and room, and puts a 6-character code on the board. Classmates join on their phones by typing the code, from the class lobby, or as a guest. Everyone gets the same 10 questions in the same order (a seed stored on the match feeds the question builder). Each question is 15 seconds, then a 2.5 second reveal. Faster correct answers score 100 to 150 points. A two-player match gets the fighting-game VS splash; three or more get the arena ladder. Matches take about 3 to 4 minutes and end on a podium with a per-question breakdown. The host can start a rematch (new code, new seed).

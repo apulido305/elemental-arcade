@@ -82,7 +82,7 @@ test('Firebase unavailable: VS is hidden, the disabled line shows, solo still pl
   const dev = await arena.device({ width: PHONE, firebase: 'blocked' });
   await dev.goto('/');
   await expect(dev.page.locator('[data-vs="vs-open"]')).toHaveCount(0);
-  await expect(dev.page.locator('[data-vs="vs-off"]')).toHaveText('VS Arena needs sign-in, which is not set up on this copy.');
+  await expect(dev.page.locator('[data-vs="vs-off"]')).toHaveText('VS Arena could not load. Refresh the page to try again.');
   expect(await dev.page.evaluate(() => document.getElementById('vs').hidden)).toBe(true);
   await soloRound(dev.page);
 });

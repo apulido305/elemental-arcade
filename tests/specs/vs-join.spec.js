@@ -119,7 +119,7 @@ test.describe('class lobby', () => {
     await host.goto('/'); await mate.goto('/'); await g.goto('/');
     await host.signUp('class1', 'hosty'); await mate.signUp('class1', 'mate');
     const code = await hostArena(host, { cap: 3, listed: false, allowGuests: false });
-    await expect(host.page.locator('#vs-count')).toHaveText('(1 / 3)');
+    await expect(host.page.locator('#vs-count')).toHaveText('1/3');
     await host.page.locator('[data-vs="copy"]').click();
     expect(await host.page.evaluate(() => navigator.clipboard.readText())).toBe(code);
     await openVs(mate);
@@ -133,7 +133,7 @@ test.describe('class lobby', () => {
     await expect.poll(() => arena.backend.adminGet('matches/' + code).allowGuests).toBe(true);
     await g.page.locator('[data-vs="join-submit"]').click();
     await expect(g.page.locator('[data-vs="code"]')).toHaveText(code);
-    await expect(host.page.locator('#vs-count')).toHaveText('(3 / 3)');
+    await expect(host.page.locator('#vs-count')).toHaveText('3/3');
     // cap reached: a fourth player is told it is full
     const late = await arena.device({ width: PHONE }); await late.goto('/'); await openVs(late);
     await joinByCode(late, code, { open: false });

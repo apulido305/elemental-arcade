@@ -66,7 +66,7 @@ const MSG = {
 };
 
 /* ---------- module state ---------- */
-let ui = { open: false, err: '', form: { code: '', deck: null, room: 'mixed', cap: 20, allowGuests: true, listed: true }, guestName: randName(), busy: false, joining: false, lobby: [], ladderOpen: false, copied: false };
+let ui = { open: false, err: '', form: { code: '', deck: null, room: 'mixed', cap: 20, allowGuests: true, listed: true }, guestName: randName(), busy: false, joining: false, lobby: [], ladderOpen: false, copied: false, iconOpen: false, iconSel: null };
 let R = null;                 // the room we are attached to, or null
 let root = null, unsubLobby = null, wired = false, savedInert = false;
 let C = null, fb = null, Arc = null;
@@ -81,6 +81,11 @@ const reduced = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motio
 const narrow = () => !!(window.matchMedia && matchMedia('(max-width: 700px)').matches);
 const tone = k => { try { Arc && Arc.tone(k); } catch (e) { /* sound is optional */ } };
 const q$ = sel => root && root.querySelector(sel);
+// Profile icons come from index.html (preset ids only). An older cached index.html without them shows no icon.
+const av = (id, size, o) => (Arc && Arc.iconSVG ? Arc.iconSVG(id, size, o) : '');
+const myIcon = () => (Arc && Arc.iconOf && Arc.getIcon ? Arc.iconOf(Arc.getIcon()) : null);
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const codeHTML = c => esc(String(c).slice(0, 3)) + '<span class="g2">' + esc(String(c).slice(3)) + '</span>';   // "VQ8 FJU", read aloud in two halves
 
 /* ---------- styles ---------- */
 const CSS = `
@@ -105,7 +110,6 @@ const CSS = `
 #vs .btn[disabled]{opacity:.55;cursor:default}
 #vs .vs-err{margin:0 0 14px;padding:10px 14px;border-radius:12px;background:rgba(217,83,79,.16);border:2px solid var(--bad);color:#fff}
 #vs .vs-err[hidden]{display:none}
-#vs .vs-gname{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #vs .vs-gname b{font:400 24px/1.1 var(--display);color:var(--cream);letter-spacing:.5px}
 #vs .vs-tag{display:inline-block;font:700 10px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;padding:3px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);margin-left:6px;vertical-align:middle}
 #vs .vs-lobbylist{list-style:none;margin:0;padding:0;display:grid;gap:10px}
@@ -114,9 +118,39 @@ const CSS = `
 #vs .vs-lobbyrow small{display:block;color:var(--mute);font-size:13px}
 #vs .vs-bigcode{font:500 clamp(44px,13vw,84px)/1 var(--mono);letter-spacing:.12em;color:var(--gold);text-align:center;margin:6px 0;user-select:all;text-shadow:0 0 22px rgba(243,221,122,.3)}
 #vs .vs-center{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
-#vs .vs-plist{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:10px 0 0;padding:0}
-#vs .vs-plist li{padding:8px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);font:400 18px/1.1 var(--display);animation:vsPop .35s backwards}
+#vs .vs-plist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;list-style:none;margin:10px 0 0;padding:0}
+#vs .vs-plist li{display:flex;align-items:center;gap:8px;min-width:0;min-height:44px;padding:6px 10px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);font:400 18px/1.1 var(--display);animation:fadeIn .12s backwards}
 #vs .vs-plist li.host{border-color:var(--gold)}
+#vs .vs-plist .who{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+#vs .vs-plist .nm{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vs .vs-plist .tags{display:flex;gap:4px}
+#vs .vs-plist .vs-tag{margin-left:0;font-size:9px;padding:2px 5px}
+@media (min-width:900px){#vs .vs-plist{grid-template-columns:repeat(4,minmax(0,1fr))}}
+#vs .vs-gname{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:44px}
+#vs .vs-gname .nmw{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 180px}
+#vs .vs-picker{margin-top:12px;padding:12px;border-radius:14px;background:var(--bg0);border:2px solid var(--line)}
+#vs .vs-picker .icell{background:var(--panel)}
+#vs .vs-picker .vs-center{margin-top:12px;justify-content:flex-end}
+#vs details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;list-style:none;font:400 22px/1.1 var(--display);color:#fff}
+#vs details>summary::-webkit-details-marker{display:none}
+#vs details>summary::after{content:'+';margin-left:auto;font:700 22px/1 var(--body);color:var(--gold)}
+#vs details[open]>summary::after{content:'−'}
+#vs details[open]>summary{margin-bottom:10px}
+#vs .vs-bigcode{font-variant-ligatures:none;white-space:nowrap}
+#vs .vs-bigcode .g2{margin-left:.3em}
+#vs .vs-plate .av{display:flex;margin:0 auto 6px}
+#vs .vs-plates .vs-plate{display:inline-flex;align-items:center;gap:8px}
+#vs .vs-plates .vs-plate .av{margin:0}
+#vs .vs-pod .av{display:flex;margin:6px auto 2px}
+#vs .vs-tbl .pl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#vs .vs-lrow .st .dot,#vs .vs-lrow .st .ck{display:none}
+#vs .vs-lrow .st .dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+#vs .vs-lrow .st .ck svg{width:16px;height:16px;display:block}
+@media (max-width:520px){
+  #vs .vs-lrow .st .w{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  #vs .vs-lrow .st .dot,#vs .vs-lrow .st .ck{display:inline-block}
+  #vs .btn.small{min-height:44px}
+}
 #vs .vs-hud{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 #vs .vs-rankchip{min-width:64px;text-align:center;padding:8px 14px;border-radius:999px;background:var(--gold);color:#241c00;font:400 22px/1 var(--display)}
 #vs .vs-timer{position:relative;width:64px;height:64px;flex:none}
@@ -201,6 +235,7 @@ const CSS = `
 @media (min-width:900px){#vs .vs-play{grid-template-columns:minmax(0,1fr) 340px;align-items:start}}
 @media (max-width:700px){#vs .vs-grid{grid-template-columns:1fr}#vs .vs-stage .opts{grid-template-columns:1fr}#vs .vs-title{font-size:24px}}
 @media (prefers-reduced-motion:reduce){#vs .vs-timer .fg{transition:none}#vs .vs-plate,#vs .vs-vs,#vs .vs-arena-word,#vs .vs-cd,#vs .vs-pod,#vs .vs-reveal,#vs .vs-banner,#vs .vs-react,#vs .vs-plist li,#vs .vs-plates .vs-plate{animation:none}}
+@media (max-width:420px){#vs .vs-plist{gap:6px}#vs .vs-plist li{padding:6px 8px;gap:6px;font-size:16px}}
 `;
 function injectCss() {
   if (document.getElementById('vs-css')) return;
@@ -229,7 +264,7 @@ function wire() {
 function open() {
   if (!getEnv()) return;
   wire();
-  ui.open = true; ui.err = '';
+  ui.open = true; ui.err = ''; ui.iconOpen = false;
   if (!ui.form.deck) ui.form.deck = Arc.S.deck || 's20';
   setAppInert(true);
   if (!R) { ui.guestName = randName(); watchLobby(); }
@@ -287,11 +322,17 @@ function menuHTML() {
       '<label class="vs-chk"><input type="checkbox" data-vs="listed"' + (f.listed ? ' checked' : '') + '> List in class lobby</label>' +
       '<label class="vs-chk"><input type="checkbox" data-vs="allow-guests"' + (f.allowGuests ? ' checked' : '') + '> Allow guests</label>' +
       '<div style="margin-top:12px"><button class="btn" data-vs="host"' + (ui.busy ? ' disabled' : '') + '>Host arena</button></div></div>'
-    : '<div class="vs-panel"><h2>Host an arena</h2><p class="vs-sub">Hosting needs an account. Sign in from the arcade to host or to see your class lobby.</p>' +
-      '<div style="margin-top:12px"><button class="btn" data-vs="host" disabled>Sign in to host</button></div></div>';
+    : '<details class="vs-panel" data-vs="host-details"><summary>Host an arena (needs sign-in)</summary><p class="vs-sub">Hosting needs an account. Sign in from the arcade to host or to see your class lobby.</p>' +
+      '<div style="margin-top:12px"><button class="btn" data-vs="host" disabled>Sign in to host</button></div></details>';
+  // Guest identity: icon + generated name. The icon is picked here, before Join, and kept on this device only.
+  const picker = Arc.iconGridHTML && ui.iconOpen
+    ? '<div class="vs-picker" data-vs="icon-picker">' + Arc.iconGridHTML(ui.iconSel, 'data-vs="icon-pick"') +
+      '<div class="vs-center"><button class="btn ghost small" type="button" data-vs="icon-cancel">Cancel</button><button class="btn small" type="button" data-vs="icon-use"' + (ui.iconSel === myIcon() ? ' disabled' : '') + '>Use this</button></div></div>'
+    : '';
   const guest = acct ? '' :
-    '<div class="vs-f" style="margin-top:14px"><span class="vs-lab">Your guest name</span><div class="vs-gname"><b data-vs="guest-name">' + esc(ui.guestName) + '</b>' +
-    '<button class="btn ghost small" type="button" data-vs="guest-shuffle">Shuffle</button></div>' +
+    '<div class="vs-f" style="margin-top:14px"><span class="vs-lab">You will appear as</span><div class="vs-gname"><span class="nmw">' + av(myIcon(), 44) + '<b data-vs="guest-name">' + esc(ui.guestName) + '</b></span>' +
+    '<button class="btn ghost small" type="button" data-vs="guest-shuffle">Shuffle name</button>' +
+    (Arc.iconGridHTML ? '<button class="btn ghost small" type="button" data-vs="guest-icon" aria-expanded="' + !!ui.iconOpen + '">Change icon</button>' : '') + '</div>' + picker +
     '<span class="vs-sub">Guests play with a made-up name. Nothing is saved to an account.</span></div>';
   const join = '<div class="vs-panel"><h2>Join with a code</h2><p class="vs-sub">The host shows a 6-character code on the board. A code works for any class; the class lobby below only lists arenas from your own class.</p>' +
     '<form data-vs-form="join" style="margin-top:12px"><div class="vs-f"><label for="vs-code">Arena code</label>' +
@@ -350,6 +391,12 @@ function onClick(e) {
   const k = t.dataset.vs;
   if (k === 'close') close();
   else if (k === 'guest-shuffle') { ui.guestName = randName(); const el = q$('[data-vs="guest-name"]'); if (el) el.textContent = ui.guestName; }
+  else if (k === 'guest-icon') { ui.iconOpen = !ui.iconOpen; ui.iconSel = myIcon(); render(); const f = q$(ui.iconOpen ? '[data-vs="icon-pick"][aria-checked="true"]' : '[data-vs="guest-icon"]'); if (f) f.focus({ preventScroll: true }); }
+  else if (k === 'icon-pick') { ui.iconSel = Arc.iconOf(t.dataset.id); render(); const f = q$('[data-vs="icon-pick"][data-id="' + ui.iconSel + '"]'); if (f) f.focus({ preventScroll: true }); }
+  else if (k === 'icon-use' || k === 'icon-cancel') {
+    if (k === 'icon-use' && Arc.setIcon) Arc.setIcon(ui.iconSel);   // a guest's icon stays in this browser (never /players)
+    ui.iconOpen = false; render(); const f = q$('[data-vs="guest-icon"]'); if (f) f.focus({ preventScroll: true });
+  }
   else if (k === 'join-submit') { e.preventDefault(); joinFlow(ui.form.code); }
   else if (k === 'lobby-join') joinFlow(t.dataset.code);
   else if (k === 'host') hostFlow();
@@ -369,10 +416,18 @@ function onKey(e) {
 }
 
 /* ---------- joining and hosting ---------- */
-const seat = (nick, guest) => ({
-  nick, guest, joinedAt: fb.F.serverTimestamp(), lastSeen: fb.F.serverTimestamp(), score: 0, correct: 0, totalMs: 0,
-  answeredQ: -1, reaction: null, reactionAt: null, abandoned: false, left: false, streak: 0
-});
+// The seat carries a copy of the icon so other players can draw it without reading anyone's /players doc.
+// seatIcons turns off for the session if the live rules predate icons (not republished yet), so joining still works.
+let seatIcons = true;
+const deniedErr = e => /permission-denied/.test(String(e && e.code));
+const seat = (nick, guest) => {
+  const s = {
+    nick, guest, joinedAt: fb.F.serverTimestamp(), lastSeen: fb.F.serverTimestamp(), score: 0, correct: 0, totalMs: 0,
+    answeredQ: -1, reaction: null, reactionAt: null, abandoned: false, left: false, streak: 0
+  };
+  const ic = myIcon(); if (ic && seatIcons) s.icon = ic;
+  return s;
+};
 function normCode(raw) { return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 
 async function joinFlow(raw, opts) {
@@ -433,7 +488,8 @@ async function joinTx(code, nick, guest) {
     return;
   } catch (e) {
     // Many simultaneous joiners can exhaust the SDK's transaction attempts: retry with jitter.
-    if (!(e && e.vs) && attempt < 8 && !/permission-denied/.test(String(e && e.code))) {
+    if (deniedErr(e) && seatIcons && myIcon()) { seatIcons = false; continue; }   // old rules: retry the join without the icon
+    if (!(e && e.vs) && attempt < 8 && !deniedErr(e)) {
       await new Promise(r => setTimeout(r, (100 + Math.random() * 300) * TS()));
       continue;
     }
@@ -469,7 +525,11 @@ async function createMatch(o) {
       aggUntil: F.Timestamp.fromMillis(now + AGG_BASE * TS()), winnerUid: null, endedAt: null, rematch: null
     });
     b.set(F.doc(db, 'matches', code, 'players', uid), seat(acct.nick, false));
-    await b.commit();
+    try { await b.commit(); }
+    catch (e) {
+      if (!(deniedErr(e) && seatIcons && myIcon())) throw e;
+      seatIcons = false; i--; continue;                  // old rules: same attempt again without the icon
+    }
     return code;
   }
   throw vsErr('net');
@@ -562,7 +622,7 @@ function lobbyHTML() {
       '<div class="vs-center" style="margin-top:14px"><button class="btn" data-vs="start" disabled>Start arena</button></div>'
     : '<p class="vs-sub" style="text-align:center;margin-top:12px" id="vs-wait">Waiting for the host to start...</p>';
   return topBar('') + errBox() +
-    '<div class="vs-panel"><h2 style="text-align:center">Arena code</h2><div class="vs-bigcode" data-vs="code" aria-label="Arena code">' + esc(R.code) + '</div>' +
+    '<div class="vs-panel"><h2 style="text-align:center">Arena code</h2><div class="vs-bigcode" data-vs="code" aria-label="Arena code">' + codeHTML(R.code) + '</div>' +
     '<div class="vs-center"><button class="btn ghost small" data-vs="copy">' + (ui.copied ? 'Copied' : 'Copy code') + '</button></div>' +
     '<p class="vs-sub" style="text-align:center;margin-top:10px">Players: open VS Arena and type the code, or join from the class lobby.</p></div>' +
     '<div class="vs-panel"><h2>In the arena <span id="vs-count" class="vs-sub"></span></h2><ul class="vs-plist" data-vs="lobby-players"></ul>' + ctl +
@@ -578,10 +638,10 @@ function updateLobby() {
     const sig = list.map(p => p.uid).join(',');
     if (ul.dataset.sig !== sig) {
       ul.dataset.sig = sig;
-      ul.innerHTML = list.map(p => '<li class="' + (p.uid === m.hostUid ? 'host' : '') + '" data-uid="' + esc(p.uid) + '">' + esc(p.nick) + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + (p.uid === m.hostUid ? '<span class="vs-tag">Host</span>' : '') + '</li>').join('');
+      ul.innerHTML = list.map(p => '<li class="' + (p.uid === m.hostUid ? 'host' : '') + '" data-uid="' + esc(p.uid) + '">' + av(p.icon, 28) + '<span class="who"><span class="nm">' + esc(p.nick) + '</span>' + (p.guest || p.uid === m.hostUid ? '<span class="tags">' + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + (p.uid === m.hostUid ? '<span class="vs-tag">Host</span>' : '') + '</span>' : '') + '</span></li>').join('');
     }
   }
-  const cnt = q$('#vs-count'); if (cnt) cnt.textContent = '(' + list.length + ' / ' + (m.cap || 20) + ')';
+  const cnt = q$('#vs-count'); if (cnt) cnt.textContent = list.length + '/' + (m.cap || 20);
   const hostGone = R.players[m.hostUid] && R.players[m.hostUid].left;
   const st = q$('[data-vs="start"]'); if (st) st.disabled = list.length < 2 || !!hostGone;
   const w = q$('#vs-wait'); if (w && hostGone) w.textContent = 'The host left, so this arena will not start. You can leave.';
@@ -820,10 +880,10 @@ function splashHTML() {
   const nameOf = p => esc(p.nick) + (p.guest ? '<span class="vs-tag">Guest</span>' : '');
   let body;
   if (mode === 'duel') {
-    body = '<div class="vs-duel"><div class="vs-plate l">' + nameOf(list[0]) + '</div><div class="vs-vs">VS</div><div class="vs-plate r">' + nameOf(list[1]) + '</div></div>';
+    body = '<div class="vs-duel"><div class="vs-plate l">' + av(list[0].icon, 48) + nameOf(list[0]) + '</div><div class="vs-vs">VS</div><div class="vs-plate r">' + av(list[1].icon, 48) + nameOf(list[1]) + '</div></div>';
   } else {
     const shown = list.slice(0, 8), more = list.length - shown.length;
-    body = '<div class="vs-plates">' + shown.map((p, i) => '<div class="vs-plate" style="animation-delay:' + (i * 0.12 * TS()).toFixed(3) + 's">' + nameOf(p) + '</div>').join('') +
+    body = '<div class="vs-plates">' + shown.map((p, i) => '<div class="vs-plate" style="animation-delay:' + (i * 0.12 * TS()).toFixed(3) + 's">' + av(p.icon, 28) + '<span>' + nameOf(p) + '</span></div>').join('') +
       (more > 0 ? '<div class="vs-plate" style="animation-delay:' + (shown.length * 0.12 * TS()).toFixed(3) + 's">+ ' + more + ' more</div>' : '') + '</div>' +
       '<div class="vs-arena-word">ARENA</div><div class="vs-codeline">Code ' + esc(R.code) + '</div>';
   }
@@ -897,12 +957,13 @@ function renderLadder() {
     const me = p.uid === R.uid, r = rm[p.uid];
     const answered = (p.answeredQ == null ? -1 : p.answeredQ) >= idx;
     let st = '';
-    if (ph.name === 'question') st = gone(p) ? 'away' : answered ? '<span class="done">answered</span>' : 'thinking';
+    // On phones the words become a grey dot (thinking) and a check (answered); the words stay for screen readers.
+    if (ph.name === 'question') st = gone(p) ? 'away' : answered ? '<span class="w">answered</span><span class="ck" aria-hidden="true">' + CHECK + '</span>' : '<span class="w">thinking</span><i class="dot" aria-hidden="true"></i>';
     else if (gone(p)) st = 'away';
     const react = p.reaction && p.reactionAt && now - p.reactionAt < REACT_SHOW_BASE * TS() ? '<span class="vs-react">' + esc(cap1(String(p.reaction))) + '</span>' : '';
     let dl = '';
     if (me && showDelta && R.rankBefore[R.uid] && R.rankBefore[R.uid] !== r) { const d = R.rankBefore[R.uid] - r; dl = '<span class="dl ' + (d > 0 ? 'up' : 'dn') + '" data-vs="rank-delta">' + (d > 0 ? '+' : '') + d + '</span>'; }
-    return '<li class="vs-lrow' + (me ? ' me' : '') + (gone(p) ? ' away' : '') + '" data-vs="ladder-row" data-uid="' + esc(p.uid) + '" data-rank="' + r + '"><span class="rk">' + r + '</span>' +
+    return '<li class="vs-lrow' + (me ? ' me' : '') + (gone(p) ? ' away' : '') + '" data-vs="ladder-row" data-uid="' + esc(p.uid) + '" data-rank="' + r + '"><span class="rk">' + r + '</span>' + av(p.icon, 28) +
       '<span class="nm">' + esc(p.nick) + (me ? ' (you)' : '') + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + '</span>' + (p.streak >= 3 ? flameSVG() : '') + react + dl +
       (st ? '<span class="st' + (answered && ph.name === 'question' ? ' done' : '') + '">' + st + '</span>' : '') +
       '<span class="sc">' + p.score + '</span></li>';
@@ -1051,9 +1112,9 @@ function resultHTML() {
   const m = R.match, order = finalOrder(), rw = R.rewards || {}, S = Arc.S;
   const meP = R.players[R.uid] || {};
   const podium = order.slice(0, 3);
-  const slot = (p, i) => '<div class="vs-pod p' + (i + 1) + (p.uid === R.uid ? ' me' : '') + '" data-rank="' + (i + 1) + '" data-uid="' + esc(p.uid) + '" style="animation-delay:' + ((2 - i) * 0.25 * TS()).toFixed(2) + 's"><div class="n">' + ordinal(i + 1) + '</div><div class="nm">' + esc(p.nick) + (p.uid === R.uid ? ' (you)' : '') + '</div><div class="sc">' + (p.score || 0) + '</div></div>';
+  const slot = (p, i) => '<div class="vs-pod p' + (i + 1) + (p.uid === R.uid ? ' me' : '') + '" data-rank="' + (i + 1) + '" data-uid="' + esc(p.uid) + '" style="animation-delay:' + ((2 - i) * 0.25 * TS()).toFixed(2) + 's"><div class="n">' + ordinal(i + 1) + '</div>' + av(p.icon, i === 0 ? 64 : 48, { tile: true }) + '<div class="nm">' + esc(p.nick) + (p.uid === R.uid ? ' (you)' : '') + '</div><div class="sc">' + (p.score || 0) + '</div></div>';
   const pod = podium.length === 3 ? slot(podium[1], 1) + slot(podium[0], 0) + slot(podium[2], 2) : podium.length === 2 ? slot(podium[1], 1) + slot(podium[0], 0) : podium.map(slot).join('');
-  const field = order.map((p, i) => '<tr class="' + (p.uid === R.uid ? 'me' : '') + '" data-uid="' + esc(p.uid) + '"><td>' + (i + 1) + '</td><td>' + esc(p.nick) + (p.uid === R.uid ? ' (you)' : '') + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + (gone(p) ? '<span class="vs-tag">Left</span>' : '') + '</td><td class="r">' + (p.score || 0) + '</td><td class="r">' + (p.correct || 0) + '</td></tr>').join('');
+  const field = order.map((p, i) => '<tr class="' + (p.uid === R.uid ? 'me' : '') + '" data-uid="' + esc(p.uid) + '"><td>' + (i + 1) + '</td><td><span class="pl">' + av(p.icon, 28) + '<span>' + esc(p.nick) + (p.uid === R.uid ? ' (you)' : '') + '</span>' + (p.guest ? '<span class="vs-tag">Guest</span>' : '') + (gone(p) ? '<span class="vs-tag">Left</span>' : '') + '</span></td><td class="r">' + (p.score || 0) + '</td><td class="r">' + (p.correct || 0) + '</td></tr>').join('');
   let rows = '';
   for (let i = 0; i < N_Q; i++) {
     const a = R.answers[i], q = R.round && R.round[i]; const card = q && Arc.BY[q.cardId];
@@ -1073,7 +1134,8 @@ function resultHTML() {
     '<div class="vs-panel"><h2 style="text-align:center;font-size:30px">' + esc(title) + '</h2>' + (forfeit ? '<p class="vs-sub" style="text-align:center">Won by forfeit: the other players left.</p>' : '') +
     '<div class="vs-podium" data-vs="podium">' + pod + '</div></div>' +
     '<div class="vs-panel"><h2>Your result</h2><p style="margin:0;font:400 28px/1 var(--display);color:var(--gold)">' + (R.my.score || meP.score || 0) + ' pts &middot; ' + (meP.correct || R.my.correct || 0) + '/' + N_Q + ' right</p>' + rewards + '</div>' + cta +
-    '<div class="vs-play"><div class="vs-panel"><h2>Your answers</h2><div style="overflow-x:auto"><table class="vs-tbl" data-vs="breakdown"><thead><tr><th>#</th><th>Card</th><th>Result</th><th class="r">Pts</th><th class="r">Time</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>' +
+    // Phones: the per-question breakdown starts closed so the podium page stays short.
+    '<div class="vs-play"><details class="vs-panel" data-vs="answers"' + (narrow() ? '' : ' open') + '><summary>Your answers</summary><div style="overflow-x:auto"><table class="vs-tbl" data-vs="breakdown"><thead><tr><th>#</th><th>Card</th><th>Result</th><th class="r">Pts</th><th class="r">Time</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>' +
     '<div class="vs-panel"><h2>The field</h2><div style="overflow-x:auto"><table class="vs-tbl" data-vs="field"><thead><tr><th>#</th><th>Player</th><th class="r">Score</th><th class="r">Right</th></tr></thead><tbody>' + field + '</tbody></table></div></div></div>' +
     '<div class="vs-center"><button class="btn" data-vs="leave">Done</button></div>';
 }
@@ -1086,7 +1148,7 @@ function updateRematch() {
   }
   if (R.seenRematch !== code) { R.seenRematch = code; tone('ok'); }
   if (host) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="vs-banner" data-vs="rematch-banner" role="status"><h2 style="margin:0;font:400 24px/1.1 var(--display);color:#fff">Rematch ready</h2><div class="vs-bigcode" data-vs="rematch-code">' + esc(code) + '</div>' +
+  box.innerHTML = '<div class="vs-banner" data-vs="rematch-banner" role="status"><h2 style="margin:0;font:400 24px/1.1 var(--display);color:#fff">Rematch ready</h2><div class="vs-bigcode" data-vs="rematch-code">' + codeHTML(code) + '</div>' +
     '<button class="btn" data-vs="rematch-join" data-code="' + esc(code) + '">' + (R.guest ? 'Join again' : 'Join rematch') + '</button></div>';
 }
 async function rematch() {

@@ -42,25 +42,50 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     xp: Math.max(a.xp || 0, b.xp || 0), rounds: Math.max(a.rounds || 0, b.rounds || 0), best: Math.max(a.best || 0, b.best || 0),
     vs: mergeVs(a, b), vsAt: Math.max(a.vsAt || 0, b.vsAt || 0)
   });
+  // Profile icon: a top-level id string on the player doc (never markup). The doc's 'updated' is when it was last
+  // written; a pick made on this device after that (local.iconAt) wins, otherwise the doc keeps its icon.
+  // Ids are compared, never max()ed. Ids are checked against the game's list (and again by the rules).
+  const toMs = v => v == null ? 0 : typeof v === 'number' ? v : typeof v.toMillis === 'function' ? v.toMillis() : 0;
+  const okIcon = id => (window.Arcade && window.Arcade.iconOf ? window.Arcade.iconOf(id) : (typeof id === 'string' ? id : 'atom'));
+  const mergeIcon = (doc, local) => {
+    doc = doc || {}; local = local || {};
+    const docIcon = typeof doc.icon === 'string' ? doc.icon : null;
+    if (!docIcon || (local.icon && (local.iconAt || 0) > toMs(doc.updated))) return okIcon(local.icon);
+    return okIcon(docIcon);
+  };
+  // Until the teacher republishes firestore.rules, the old rules reject an 'icon' key, which would block every
+  // save. If that happens, write once more without the icon and stop sending it for this session.
+  let iconWrites = true;
+  const denied = e => /permission-denied/.test(String(e && e.code));
+  async function setPlayer(ref, data) {
+    if (!iconWrites) delete data.icon;
+    try { await F.setDoc(ref, data); }
+    catch (e) {
+      if (!('icon' in data) || !denied(e)) throw e;
+      iconWrites = false; delete data.icon;
+      await F.setDoc(ref, data);
+    }
+  }
   const who = u => { const [cls, nick] = u.email.split('@')[0].split('_'); return { cls, nick }; };
 
   const changeCbs = [], statusCbs = [];
-  let last = null, busy = false, timer = null, pending = null;
-  const emit = (user, prog) => { last = [user, prog]; changeCbs.forEach(cb => cb(user, prog)); };
+  let last = null, busy = false, timer = null, pending = null, pendingIcon = null;
+  const emit = (user, prog, meta) => { last = [user, prog, meta]; changeCbs.forEach(cb => cb(user, prog, meta)); };
   const setStatus = s => statusCbs.forEach(cb => cb(s));
 
   async function flush() {
     const u = auth.currentUser;
     // A guest (anonymous) session never writes /players.
     if (!pending || !u || u.isAnonymous) return;
-    const p = pending; pending = null;
+    const p = pending, pi = pendingIcon; pending = null;
     setStatus('saving');
     try {
       const ref = F.doc(db, 'players', u.uid);
       const snap = await F.getDoc(ref);
-      const merged = snap.exists() ? merge(snap.data().progress || EMPTY, p) : p;
+      const doc = snap.exists() ? snap.data() : null;
+      const merged = doc ? merge(doc.progress || EMPTY, p) : p;
       const id = who(u);
-      await F.setDoc(ref, { progress: merged, nick: id.nick, cls: id.cls, updated: F.serverTimestamp() });
+      await setPlayer(ref, { progress: merged, nick: id.nick, cls: id.cls, icon: mergeIcon(doc, pi), updated: F.serverTimestamp() });
       setStatus('saved');
     } catch (e) {
       pending = pending || p;
@@ -75,12 +100,12 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     if (!u) { emit(null, null); return; }
     // An anonymous VS guest is not an account: no /players read, no nickname, shown as signed out.
     if (u.isAnonymous) { emit(null, null); return; }
-    let prog = null;
+    let prog = null, meta = { icon: null, updated: 0 };
     try {
       const s = await F.getDoc(F.doc(db, 'players', u.uid));
-      if (s.exists()) prog = s.data().progress || null;
+      if (s.exists()) { const d = s.data(); prog = d.progress || null; meta = { icon: typeof d.icon === 'string' ? d.icon : null, updated: toMs(d.updated) }; }
     } catch (e) { setStatus('offline'); }
-    emit(who(u), prog);
+    emit(who(u), prog, meta);
   });
 
   window.Cloud = {
@@ -98,19 +123,22 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
       return cred.user;
     },
     async signOutGuest() { if (auth.currentUser && auth.currentUser.isAnonymous) await A.signOut(auth); },
-    onChange(cb) { changeCbs.push(cb); if (last) cb(last[0], last[1]); },
+    onChange(cb) { changeCbs.push(cb); if (last) cb(last[0], last[1], last[2]); },
     onStatus(cb) { statusCbs.push(cb); },
-    save(progress) { pending = progress; clearTimeout(timer); timer = setTimeout(flush, 1200); },
-    async signUp(cls, nick, pin, keep, initial) {
+    // meta: {icon, iconAt} from the game. iconAt is when the icon was picked on this device (0 = not picked here).
+    save(progress, meta) { pending = progress; if (meta) pendingIcon = meta; clearTimeout(timer); timer = setTimeout(flush, 1200); },
+    // Pure merge helpers, exposed for tests.
+    _merge: { progress: merge, icon: mergeIcon },
+    async signUp(cls, nick, pin, keep, initial, icon) {
       const c = norm(cls), n = norm(nick);
       busy = true;
       try {
         await A.setPersistence(auth, keep ? A.browserLocalPersistence : A.browserSessionPersistence);
         const cred = await A.createUserWithEmailAndPassword(auth, email(c, n), pass(pin, c));
-        const progress = Object.assign({}, EMPTY, initial || {});
-        await F.setDoc(F.doc(db, 'players', cred.user.uid), { progress, nick: n, cls: c, updated: F.serverTimestamp() });
+        const progress = Object.assign({}, EMPTY, initial || {}), ic = okIcon(icon);
+        await setPlayer(F.doc(db, 'players', cred.user.uid), { progress, nick: n, cls: c, icon: ic, updated: F.serverTimestamp() });
         busy = false;
-        emit({ cls: c, nick: n }, progress);
+        emit({ cls: c, nick: n }, progress, { icon: ic, updated: Date.now() });
       } finally { busy = false; }
     },
     async signIn(cls, nick, pin, keep) {
