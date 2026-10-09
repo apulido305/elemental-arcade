@@ -283,6 +283,11 @@ main.enter>*{animation:fadeIn .3s backwards}
 .playnow b{display:block;font:400 22px/1.15 var(--display);color:#fff;letter-spacing:.3px}
 .playnow .sub{margin:2px 0 0;font-size:14px}
 .playnow .btn{min-width:120px;min-height:52px;font-size:22px}
+.playnow>.qnpick{display:flex;align-items:center;gap:6px;flex:0 0 auto;min-width:0}
+.qnpick .lab{font-size:13px;color:var(--mute);margin-right:2px}
+.qn{min-width:48px;min-height:44px;padding:0 8px;border-radius:12px;background:var(--panel2);color:var(--text);border:2px solid var(--line);font:400 20px/1 var(--display);cursor:pointer}
+.qn.on{background:var(--gold);color:#241c00;border-color:var(--gold)}
+.qn:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
 .step{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin-right:8px;border-radius:50%;background:var(--gold);color:#241c00;font:400 18px/1 var(--display);vertical-align:3px}
 .roomstat{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);color:var(--text)}
 .roomstat:empty{display:none}
@@ -351,8 +356,9 @@ main.enter>*{animation:fadeIn .3s backwards}
   .room .nm{font-size:17px}
   .room .ds{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .stickybar .btn{flex:1 1 0;min-width:0}
-  .playnow{flex-wrap:nowrap;padding:12px 12px 12px 14px;margin-bottom:18px}
-  .playnow>div{flex:1 1 auto}
+  .playnow{flex-wrap:wrap;row-gap:10px;padding:12px 12px 12px 14px;margin-bottom:18px}
+  .playnow>div{flex:1 1 0}
+  .playnow>.qnpick{order:3;flex:1 1 100%}   /* phones: title and Play stay on row one, the round-length picker gets row two */
   .playnow b{font-size:19px}
   .playnow .btn{min-width:96px;padding:8px 16px}
   .notice{font-size:14px;padding:6px 6px 6px 12px;gap:8px}
@@ -475,13 +481,16 @@ const PKEY=KEY+'-prefs';
 const PROG=['owned','miss','xp','stars','rounds','best','vs','vsAt'];
 const VS0=()=>({w:0,l:0,streak:0,best:0,played:0});
 // icon: profile icon id; iconAt: when it was last picked on this device (ms), so the newer of device and account wins.
-const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,mute:false,deck:'s20',room:'mixed',icon:DEFAULT_ICON,iconAt:0};
+/* Round length choices (solo here, VS via the match doc). 10 is the default and the only length older pages know. */
+const QNS=[10,15,20];
+const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,mute:false,deck:'s20',room:'mixed',qn:10,icon:DEFAULT_ICON,iconAt:0};
 const readGuest=()=>{try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}return null};
 function loadGuest(){
   Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,icon:DEFAULT_ICON,iconAt:0});
   const g=readGuest();if(g)Object.assign(S,g);
   if(!DECKS.some(d=>d.id===S.deck))S.deck='s20';
   if(!ROOMS.some(r=>r.id===S.room))S.room='mixed';
+  if(!QNS.includes(S.qn))S.qn=10;
   S.icon=iconOf(S.icon);S.iconAt=+S.iconAt||0;
 }
 loadGuest();
@@ -494,7 +503,7 @@ let SYNC='';            // '', 'saving', 'saved', 'offline'
 function save(){
   try{
     // Signed in: the device keeps only prefs, plus the icon tagged with whose it is (shown again after a quick refresh).
-    if(ACCT)localStorage.setItem(PKEY,JSON.stringify({mute:S.mute,deck:S.deck,room:S.room,icon:S.icon,iconAt:S.iconAt,iconFor:acctKey()}));
+    if(ACCT)localStorage.setItem(PKEY,JSON.stringify({mute:S.mute,deck:S.deck,room:S.room,qn:S.qn,icon:S.icon,iconAt:S.iconAt,iconFor:acctKey()}));
     else localStorage.setItem(KEY,JSON.stringify(S));
   }catch(e){}
   if(ACCT&&window.Cloud)Cloud.save(progOf(),{icon:S.icon,iconAt:S.iconAt});
@@ -861,16 +870,19 @@ function makeQ(it,room,rng){
 }
 /* VS Arena: the same 10 questions for everyone, locked to the match seed. Pure apart from reading the card data.
    Samples without replacement; repeats a card only when the pool has fewer than 10. */
-function buildRound(deckId,roomId,seed){
+function buildRound(deckId,roomId,seed,n){
+  n=QNS.includes(n)?n:10;   // old matches have no qn: 10
   const room=roomOf(roomId);const rng=mulberry32(seed);
   if(room.solo)return [];   // Review Room reads S.miss: never part of a shared seeded round
   const prevDeck=QDECK;QDECK=deckId;
   try{
     const pool=roomPool(room,deckId);if(!pool.length)return [];
     let order=shuffle(pool,rng);
-    while(order.length<10)order=order.concat(shuffle(pool,rng));
+    while(order.length<n)order=order.concat(shuffle(pool,rng));
     const out=[];
-    for(let i=0;i<order.length&&out.length<10;i++){
+    for(let i=0;out.length<n;i++){
+      // A card whose generator returned null leaves a gap: top up with another shuffle (rounds that were already full are unchanged).
+      if(i===order.length){if(i>=n*4)break;order=order.concat(shuffle(pool,rng))}
       const q=makeQ(order[i],room,rng);if(!q)continue;
       out.push({prompt:q.prompt,clue:q.clue,options:q.opts.map(o=>o.h),correct:q.opts.findIndex(o=>o.ok),cardId:q.item.id,type:q.type,mono:!!q.mono,exp:q.exp});
     }
@@ -893,7 +905,8 @@ function startRound(roomId){
   const room=roomOf(roomId);const pool=roomPool(room,S.deck);
   if(!roomN(room,S.deck))return;
   V.deckId=S.deck;
-  const n=roomId==='review'?Math.min(10,pool.length):Math.min(10,Math.max(5,pool.length));
+  // S.qn questions, but never more than the room has cards (small pools still get at least 5, with repeats).
+  const n=roomId==='review'?Math.min(S.qn,pool.length):Math.min(S.qn,Math.max(5,pool.length));
   const picks=[];let bag=pool.slice();
   if(roomId==='review')picks.push(...pool.slice().sort((a,b)=>S.miss[b.id]-S.miss[a.id]).slice(0,n));   // most-missed first
   while(picks.length<n){
@@ -978,6 +991,8 @@ function vsHTML(){
 /* The room Play now uses: the remembered one if this deck can fill it, else Mixed Pack. */
 const playRoom=()=>{const r=roomOf(S.room);return r&&roomN(r,S.deck)?r:roomOf('mixed')};
 const lockedMsg=r=>{if(r.id==='review')return roomPool(r,S.deck).length?'The Review Room opens when you have missed 3 cards.':'No misses yet. Nice.';const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
+/* Round length picker: three toggle buttons, one pressed. Saved on this device with the deck and room. */
+const qnHTML=()=>'<div class="qnpick" role="group" aria-label="Questions per round"><span class="lab">Questions</span>'+QNS.map(n=>'<button class="qn'+(n===S.qn?' on':'')+'" data-act="qn" data-id="'+n+'" aria-pressed="'+(n===S.qn)+'">'+n+'</button>').join('')+'</div>';
 let HOMESEEN=false;
 function homeHTML(){
   const deck=DECKS.find(d=>d.id===S.deck);const pr=playRoom();
@@ -993,7 +1008,7 @@ function homeHTML(){
   }).join('');
   const stag=!HOMESEEN;HOMESEEN=true;
   return noticeHTML()+vsHTML()+
-  '<section class="playnow" data-ui="play-now"><div><b>'+esc(deck.name)+' · '+esc(pr.name)+'</b><p class="sub">Rounds are 10 questions. Every correct answer wins that card.</p></div><button class="btn" data-act="play">Play</button></section>'+
+  '<section class="playnow" data-ui="play-now"><div><b>'+esc(deck.name)+' · '+esc(pr.name)+'</b><p class="sub">Every correct answer wins that card.</p></div>'+qnHTML()+'<button class="btn" data-act="play">Play</button></section>'+
   '<section><div class="sechead"><div><h1 class="h"><span class="step" aria-hidden="true">1</span>Pick a deck</h1><p class="sub hint">Every correct answer wins that card for your binder. Cards you miss come back more often.</p></div></div><div class="decks">'+chips+'</div></section>'+
   '<section class="sec"><div class="sechead"><h2 class="h"><span class="step" aria-hidden="true">2</span>Pick a room</h2><span class="sub" style="margin:0">Playing: <b style="color:var(--gold)">'+deck.name+'</b></span></div>'+
   '<p class="roomstat" role="status" data-ui="room-status">'+esc(V.roomMsg||'')+'</p><div class="rooms'+(stag?' stag':'')+'">'+rooms+'</div></section>';
@@ -1169,6 +1184,7 @@ const onClick=e=>{
   const a=t.dataset.act,id=t.dataset.id;
   if(a==='closemodal'){V.modal=null;renderModal();return}
   if(a==='deck'){S.deck=id;V.deckId=id;V.roomMsg='';save();render()}
+  else if(a==='qn'){const n=+id;if(QNS.includes(n)){S.qn=n;save();render()}}
   else if(a==='room'){
     if(t.getAttribute('aria-disabled')==='true'){V.roomMsg=lockedMsg(roomOf(id));const st=app.querySelector('[data-ui="room-status"]');if(st)st.textContent=V.roomMsg;return}
     V.roomMsg='';S.room=id;save();startRound(id);
@@ -1254,7 +1270,7 @@ function wireCloud(){
     if(user){
       ACCT={nick:user.nick,cls:user.cls};
       let mine=null;
-      try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck;if(ROOMS.some(r=>r.id===p.room))S.room=p.room;if(p.iconFor===acctKey())mine=p}}catch(e){}
+      try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck;if(ROOMS.some(r=>r.id===p.room))S.room=p.room;if(QNS.includes(p.qn))S.qn=p.qn;if(p.iconFor===acctKey())mine=p}}catch(e){}
       const m=meta||{},local=mine&&+mine.iconAt>(+m.updated||0);
       S.icon=iconOf(local?mine.icon:m.icon);S.iconAt=local?+mine.iconAt:0;
       applyProg(prog);
@@ -1291,7 +1307,7 @@ addEventListener('resize',()=>{mclr();clearTimeout(rz);rz=setTimeout(()=>{
   RW=w;if(V.screen!=='home')render();if(V.modal)renderModal(true);
 },180)});
 /* Hooks for vs.js (VS Arena). Solo play does not depend on any of this. */
-window.Arcade={S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
+window.Arcade={QNS,S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
   ICONS,ICON_IDS,iconOf,iconSVG,iconGridHTML,setIcon,getIcon:()=>S.icon,
   goto:scr=>{V.anim='screen';V.screen=scr;V.authErr='';V.modal=null;render();window.scrollTo(0,0)},
@@ -1301,6 +1317,6 @@ render();
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
 <script type="module" src="cloud.js?v=4"></script>
-<script type="module" src="vs.js?v=5"></script>
+<script type="module" src="vs.js?v=6"></script>
 </body>
 </html>

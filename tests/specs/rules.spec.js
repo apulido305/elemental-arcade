@@ -119,7 +119,7 @@ test.describe('rules: answers and scoring', () => {
       return b.commit();
     };
     await expectDenied(batch(0, { id: `${kid.uid}_1` }), '{uid}_{q}');
-    await expectDenied(batch(10), 'q int 0..9');
+    await expectDenied(batch(10), 'q int 0..qn-1');   // a 10-question match: q 0..9
     await expectDenied(batch(0, { doc: { points: 151 } }, { score: F.increment(151) }), 'points int 0..150');
     await expectDenied(batch(0, { doc: { correct: false, points: 50 } }), '0 when wrong');
     await expectDenied(batch(0, { doc: { extra: 1 } }), 'exactly the allowed keys');
@@ -154,19 +154,24 @@ test.describe('rules: answers and scoring', () => {
     await F.updateDoc(seat, { lastSeen: F.serverTimestamp(), streak: 0, reaction: 'nice', reactionAt: Date.now() });   // no answer needed for these
   });
 
-  test('answer after the window and answer ahead of the window are rejected', async ({ arena }) => {
+  test('answer after the late window and answer ahead of the window are rejected; a late arrival inside it counts', async ({ arena }) => {
     const { kid, code } = await playing(arena);
     const ts = arena.backend.timeScale;
     toQuestion(arena, code, 2, 0);
     arena.backend.advanceClock(-5000 * ts - 1000);                                  // well before question 2 opens
-    await expectDenied(kid.answer(code, 2), 'only while the question is on screen');   // ahead of the window
+    await expectDenied(kid.answer(code, 2), 'late window');                         // ahead of the window
     toQuestion(arena, code, 2, 0.9);
     await kid.answer(code, 2, { elapsedMs: 15000 * ts - 1 });                       // late in its own window: fine
-    toQuestion(arena, code, 3, 0); arena.backend.advanceClock(17000 * ts + 500);    // past qOpens + 17 s: the reveal is over
-    await expectDenied(kid.answer(code, 3), 'only while the question is on screen');   // after the window
+    toQuestion(arena, code, 3, 0); arena.backend.advanceClock(23000 * ts + 500);    // past qOpens + 15 s + 8 s late window
+    await expectDenied(kid.answer(code, 3), 'late window');                         // after the window
     toQuestion(arena, code, 3, 0.5);
     await kid.answer(code, 3, { elapsedMs: 7000 * ts });                             // right on time still works
-    expect((await kid.players(code)).find(p => p.id === kid.uid).answeredQ).toBe(3);
+    // slow connection: answered in time, but the write reaches the server 6 s after question 4 closed. It counts.
+    toQuestion(arena, code, 4, 0); arena.backend.advanceClock(21000 * ts);
+    await kid.answer(code, 4, { elapsedMs: 14000 * ts, points: 105 });
+    const me = (await kid.players(code)).find(p => p.id === kid.uid);
+    expect(me.answeredQ).toBe(4);
+    expect(arena.backend.denials.length).toBe(2);                                    // only the two out-of-window answers
   });
 
   test('an abandoned seat cannot answer, and abandoned can never go back to false', async ({ arena }) => {
@@ -453,5 +458,51 @@ test.describe('rules: rooms (ion, metal; review is solo only)', () => {
     const good = await signedKid(arena, 'kid2');
     await seat(good);
     expect(await host.getMatch(code)).toMatchObject({ playerCount: 2, room: 'ion' });
+  });
+});
+
+test.describe('rules: round length (qn) and late answers', () => {
+  test('qn is optional on create and must be 10, 15 or 20; only the host changes it, only in the lobby', async ({ arena }) => {
+    const { host } = await openLobby(arena);
+    for (const qn of [10, 15, 20]) expect((await host.getMatch(await host.createMatch({ qn })))).toMatchObject({ qn });
+    expect((await host.getMatch(await host.createMatch())).qn).toBeUndefined();   // older clients: no field means 10
+    for (const qn of [0, 9, 12, 25, '15']) await expectDenied(host.createMatch({ qn }), 'qn (if present)');
+    const code = await host.createMatch();
+    await host.F.updateDoc(host.ref('matches', code), { qn: 20 });
+    await expectDenied(host.F.updateDoc(host.ref('matches', code), { qn: 30 }), 'qn is 10, 15 or 20');
+    const kid = await signedKid(arena, 'kid'); await kid.join(code);
+    await expectDenied(kid.F.updateDoc(kid.ref('matches', code), { qn: 15 }));          // not the host
+    await host.start(code);
+    await expectDenied(host.F.updateDoc(host.ref('matches', code), { qn: 15 }));        // not in the lobby any more
+  });
+
+  test('a 15-question match accepts answers to q 10..14 and nothing past 14', async ({ arena }) => {
+    const { host, code } = await openLobby(arena, { match: { qn: 15 } });
+    const kid = await signedKid(arena, 'kid'); await kid.join(code); await host.start(code);
+    for (const q of [9, 10, 14]) { toQuestion(arena, code, q, 0.2); await kid.answer(code, q); }
+    toQuestion(arena, code, 15, 0.2);
+    await expectDenied(kid.answer(code, 15), 'q int 0..qn-1');
+    expect((await kid.players(code)).find(p => p.id === kid.uid)).toMatchObject({ answeredQ: 14, correct: 3 });
+  });
+
+  test("the last question's late answer still lands after the clock ends the match; earlier ones and early forfeits do not", async ({ arena }) => {
+    const { host, kid, code } = await (async () => {
+      const { host, code } = await openLobby(arena);
+      const kid = await signedKid(arena, 'kid'); await kid.join(code); await host.start(code);
+      return { host, kid, code };
+    })();
+    const ts = arena.backend.timeScale;
+    toQuestion(arena, code, 8, 0.5); await kid.answer(code, 8);
+    toQuestion(arena, code, 9, 1); arena.backend.advanceClock(3000 * ts);            // last question closed 3 s ago
+    await host.finish(code, host.uid);                                               // the clock ended the match
+    await kid.answer(code, 9, { elapsedMs: 14500 * ts, points: 102 });               // the slow write arrives now: counts
+    const me = (await kid.players(code)).find(p => p.id === kid.uid);
+    expect(me).toMatchObject({ answeredQ: 9, correct: 2 });
+    // forfeit part way through: a late answer to that (not last) question is refused once the match is done
+    const { host: h2, code: c2 } = await openLobby(arena, { nick: 'host2' });
+    const k2 = await signedKid(arena, 'kid2'); await k2.join(c2); await h2.start(c2);
+    toQuestion(arena, c2, 3, 1); arena.backend.advanceClock(1000 * ts);
+    await h2.finish(c2, h2.uid);
+    await expectDenied(k2.answer(c2, 3), "'done' for the last question");
   });
 });

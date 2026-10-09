@@ -31,7 +31,7 @@ Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon
 
 ## VS Arena (live multiplayer, 2 to 20 players)
 
-One signed-in student hosts, picks a deck and room, and puts a 6-character code on the board. Classmates join on their phones by typing the code, from the class lobby, or as a guest. Everyone gets the same 10 questions in the same order (a seed stored on the match feeds the question builder). Each question is 15 seconds, then a 2.5 second reveal. Faster correct answers score 100 to 150 points. A two-player match gets the fighting-game VS splash; three or more get the arena ladder. Matches take about 3 to 4 minutes and end on a podium with a per-question breakdown. The host can start a rematch (new code, new seed).
+One signed-in student hosts, picks a deck and room, and puts a 6-character code on the board. Classmates join on their phones by typing the code, from the class lobby, or as a guest. Everyone gets the same questions in the same order (a seed stored on the match feeds the question builder). The host picks 10, 15 or 20 questions (solo players pick the same on the home screen). Each question is 15 seconds, then a 2.5 second reveal. Faster correct answers score 100 to 150 points. A two-player match gets the fighting-game VS splash; three or more get the arena ladder. A 10-question match takes about 3 to 4 minutes (20 questions about 6). Before the podium, every phone takes a few seconds to check the final scores with the server, so an answer from a slow connection that arrives up to 8 seconds after its question closed still counts. The host can start a rematch (new code, new seed).
 
 - The shared clock is the match's `startAt` server timestamp. Nothing advances the game on a server; every tab runs the same schedule. School devices are assumed to be NTP-synced within a second or two.
 - A code works for any class. The class lobby only lists open arenas from the signed-in student's own class. Guests never see the lobby.
@@ -47,7 +47,7 @@ One signed-in student hosts, picks a deck and room, and puts a 6-character code 
 
 ### Good to know
 
-- **Cheating:** correctness and timing are computed in each student's browser, so a determined student can cheat. The rules stop obvious abuse (bad shapes, impossible scores, writing as someone else) but cannot prove an answer was honest.
+- **Cheating:** correctness and timing are computed in each student's browser, so a determined student can cheat. The 8-second late window for slow connections means a student who edits the page could also answer during the reveal. The rules stop obvious abuse (bad shapes, impossible scores, writing as someone else) but cannot prove an answer was honest.
 - **Abuse limits:** Auth sign-in rate limits can be tightened in the Firebase console. Turn on App Check if abuse appears.
 - **Cleanup (optional):** add a Firestore TTL policy on the `expireAt` field of `matches` to auto-delete old lobbies. Expired lobbies are only marked `expired`, never deleted by the app.
 - **After an update, everyone refresh the page before joining an arena.** Questions are built from the match seed, so a phone with an old cached page can see different questions from a phone with the new one.
