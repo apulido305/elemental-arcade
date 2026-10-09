@@ -73,6 +73,10 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
   const emit = (user, prog, meta) => { last = [user, prog, meta]; changeCbs.forEach(cb => cb(user, prog, meta)); };
   const setStatus = s => statusCbs.forEach(cb => cb(s));
 
+  // Last known server doc for the signed-in uid, so a save merges against it instead of re-reading every time.
+  // Stale after 2 minutes or after a failed write; then the next save reads the server again.
+  const CACHE_MS = 120000;
+  let cache = null;
   async function flush() {
     const u = auth.currentUser;
     // A guest (anonymous) session never writes /players.
@@ -81,13 +85,17 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     setStatus('saving');
     try {
       const ref = F.doc(db, 'players', u.uid);
-      const snap = await F.getDoc(ref);
-      const doc = snap.exists() ? snap.data() : null;
+      let doc;
+      if (cache && cache.uid === u.uid && Date.now() - cache.at < CACHE_MS) doc = cache.doc;
+      else { cache = null; const snap = await F.getDoc(ref); doc = snap.exists() ? snap.data() : null; }
       const merged = doc ? merge(doc.progress || EMPTY, p) : p;
       const id = who(u);
-      await setPlayer(ref, { progress: merged, nick: id.nick, cls: id.cls, icon: mergeIcon(doc, pi), updated: F.serverTimestamp() });
+      const out = { progress: merged, nick: id.nick, cls: id.cls, icon: mergeIcon(doc, pi), updated: F.serverTimestamp() };
+      await setPlayer(ref, out);
+      cache = { uid: u.uid, at: Date.now(), doc: { progress: merged, icon: out.icon || (doc && doc.icon), updated: Date.now() } };
       setStatus('saved');
     } catch (e) {
+      cache = null;
       pending = pending || p;
       setStatus('offline');
     }
@@ -97,12 +105,13 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
 
   A.onAuthStateChanged(auth, async u => {
     if (busy) return;
-    if (!u) { emit(null, null); return; }
+    if (!u) { cache = null; emit(null, null); return; }
     // An anonymous VS guest is not an account: no /players read, no nickname, shown as signed out.
     if (u.isAnonymous) { emit(null, null); return; }
     let prog = null, meta = { icon: null, updated: 0 };
     try {
       const s = await F.getDoc(F.doc(db, 'players', u.uid));
+      cache = { uid: u.uid, at: Date.now(), doc: s.exists() ? s.data() : null };
       if (s.exists()) { const d = s.data(); prog = d.progress || null; meta = { icon: typeof d.icon === 'string' ? d.icon : null, updated: toMs(d.updated) }; }
     } catch (e) { setStatus('offline'); }
     emit(who(u), prog, meta);

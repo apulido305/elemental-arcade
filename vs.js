@@ -654,7 +654,7 @@ function lobbyTick() {
   const m = R.match; if (!m) return;
   const left = toMs(m.expireAt) - Date.now();
   const el = q$('#vs-expiry');
-  if (el && toMs(m.expireAt)) { const s = Math.max(0, Math.ceil(left / 1000 / TS())); el.textContent = 'This lobby closes in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' if it does not start.'; }
+  if (el && toMs(m.expireAt)) { const s = Math.max(0, Math.ceil(left / 1000 / TS())); const t = 'This lobby closes in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' if it does not start.'; if (el.textContent !== t) el.textContent = t; }
   if (toMs(m.expireAt) && left < 0) {
     fb.F.updateDoc(R.mref, { status: 'expired' }).catch(() => {});
     R.view = 'gone'; R.goneMsg = MSG.expired; stopTimers(); detachPlayers(); render();
@@ -713,7 +713,8 @@ async function leaveRoom() {
   teardown();
   if (guest) await guestAck();
   ui.err = ''; ui.guestName = randName();
-  watchLobby(); render();
+  if (ui.open) watchLobby();
+  render();
 }
 
 /* ---------- page lifecycle ---------- */
@@ -764,7 +765,8 @@ function tickNow() {
   } else R.phase = ph;
   updateTimer(ph);
   if (ph.name === 'done') endByClock();
-  expireReactions();
+  const nw = Date.now();
+  if (lastReactSig || nw - R.lastReact < REACT_GAP_BASE * TS() || Object.values(R.players).some(p => p.reaction && p.reactionAt && nw - p.reactionAt < REACT_SHOW_BASE * TS())) expireReactions();
 }
 function onPhase(ph, prev) {
   // Settle every reveal up to now (idempotent), so a throttled tab still collects its card XP.
@@ -905,21 +907,24 @@ function updateTimer(ph) {
         if (cd.textContent !== String(secs)) { cd.textContent = String(secs); tone(secs === 1 ? 'ok' : 'flip'); }
       }
     }
-    if (t) { t.querySelector('b').textContent = ''; setRing(t, 0, ''); }
+    if (t) { setTxt(t.querySelector('b'), ''); setRing(t, 0, ''); }
     return;
   }
   if (!t) return;
   if (ph.name === 'question') {
     setRing(t, ph.left / Q_MS(), ph.left / Q_MS() < .34 ? 'low' : '');
-    t.querySelector('b').textContent = Math.max(0, Math.ceil(ph.left / 1000 / TS()));
+    setTxt(t.querySelector('b'), Math.max(0, Math.ceil(ph.left / 1000 / TS())));
   } else if (ph.name === 'reveal') {
     setRing(t, ph.left / REVEAL_MS(), 'rev');
-    t.querySelector('b').textContent = Math.max(0, Math.ceil(ph.left / 1000 / TS()));
-  } else { setRing(t, 0, ''); t.querySelector('b').textContent = ''; }
+    setTxt(t.querySelector('b'), Math.max(0, Math.ceil(ph.left / 1000 / TS())));
+  } else { setRing(t, 0, ''); setTxt(t.querySelector('b'), ''); }
 }
+function setTxt(el, v) { v = String(v); if (el && el.textContent !== v) el.textContent = v; }
 function setRing(t, frac, cls) {
-  const fg = t.querySelector('.fg'); if (fg) fg.style.strokeDashoffset = String(138.2 * (1 - Math.max(0, Math.min(1, frac))));
-  t.classList.toggle('low', cls === 'low'); t.classList.toggle('rev', cls === 'rev');
+  const fg = t.querySelector('.fg'), o = String(138.2 * (1 - Math.max(0, Math.min(1, frac)))); if (fg && fg.style.strokeDashoffset !== o) fg.style.strokeDashoffset = o;
+  const lo = cls === 'low', rv = cls === 'rev';
+  if (t.classList.contains('low') !== lo) t.classList.toggle('low', lo);
+  if (t.classList.contains('rev') !== rv) t.classList.toggle('rev', rv);
 }
 
 function shownScore() {
@@ -943,7 +948,12 @@ function updateHud() {
 
 /* ---------- play: ladder ---------- */
 function flameSVG() { return '<svg class="vs-flame" viewBox="0 0 16 20" aria-label="On a streak" role="img"><path d="M8 0c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3C6 7 6 3 8 0z"/></svg>'; }
+let ladderRaf = 0;
 function renderLadder() {
+  if (ladderRaf) return;
+  ladderRaf = requestAnimationFrame(() => { ladderRaf = 0; drawLadder(); });
+}
+function drawLadder() {
   const ul = q$('#vs-ladder'); if (!ul || !R) return;
   const ph = R.phase || { name: 'lead' }, rows = frozenRows(), rm = rankMap(rows), now = Date.now();
   const idx = ph.index == null ? 0 : ph.index;
@@ -952,8 +962,7 @@ function renderLadder() {
   let vis = rows;
   const collapse = narrow() && rows.length > 6 && !ui.ladderOpen;
   if (collapse) { vis = rows.slice(0, 5); const mine = rows.find(p => p.uid === R.uid); if (mine && rm[R.uid] > 5) vis = vis.concat([mine]); }
-  const before = {}; ul.querySelectorAll('[data-uid]').forEach(li => { before[li.dataset.uid] = li.getBoundingClientRect().top; });
-  ul.innerHTML = vis.map(p => {
+  const html = vis.map(p => {
     const me = p.uid === R.uid, r = rm[p.uid];
     const answered = (p.answeredQ == null ? -1 : p.answeredQ) >= idx;
     let st = '';
@@ -968,16 +977,23 @@ function renderLadder() {
       (st ? '<span class="st' + (answered && ph.name === 'question' ? ' done' : '') + '">' + st + '</span>' : '') +
       '<span class="sc">' + p.score + '</span></li>';
   }).join('');
-  // Rank change animation: slide each row from where it was.
+  const moreHTML = narrow() && rows.length > 6 ? '<button class="btn ghost small vs-more" data-vs="ladder-toggle">' + (ui.ladderOpen ? 'Show top 5' : 'Show all ' + rows.length) + '</button>' : '';
+  const more = q$('#vs-ladder-more');
+  if (more && more.dataset.sig !== moreHTML) { more.dataset.sig = moreHTML; more.innerHTML = moreHTML; }
+  // Row HTML is the whole signature: unchanged rows are not rebuilt, so the reaction pop does not replay.
+  if (ul.dataset.sig === html) return;
+  const lis = Array.from(ul.querySelectorAll('[data-uid]')), before = lis.map(li => li.getBoundingClientRect().top);
+  const prev = {}; lis.forEach((li, i) => { prev[li.dataset.uid] = before[i]; });
+  ul.dataset.sig = html; ul.innerHTML = html;
+  // Rank change animation: slide each row from where it was (all reads first, then all writes).
   if (!reduced()) {
-    ul.querySelectorAll('[data-uid]').forEach(li => {
-      const b = before[li.dataset.uid]; if (b == null) return;
-      const d = b - li.getBoundingClientRect().top;
+    const now2 = Array.from(ul.querySelectorAll('[data-uid]')), tops = now2.map(li => li.getBoundingClientRect().top);
+    now2.forEach((li, i) => {
+      const b = prev[li.dataset.uid]; if (b == null) return;
+      const d = b - tops[i];
       if (Math.abs(d) > 2 && li.animate) li.animate([{ transform: 'translateY(' + d + 'px)' }, { transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
     });
   }
-  const more = q$('#vs-ladder-more');
-  if (more) more.innerHTML = narrow() && rows.length > 6 ? '<button class="btn ghost small vs-more" data-vs="ladder-toggle">' + (ui.ladderOpen ? 'Show top 5' : 'Show all ' + rows.length) + '</button>' : '';
 }
 let lastReactSig = '';
 function expireReactions() {
@@ -1050,9 +1066,15 @@ async function aggTick() {
 }
 async function endMatch(status, winnerUid) {
   if (!R || R.ending) return;
+  const r = R, F = fb.F, db = fb.db;
+  if (!r.match || r.match.status !== 'playing') return;
   R.ending = true;
-  const F = fb.F, db = fb.db, r = R;
   try {
+    // Only the aggregator ends at once; everyone else waits a beat and re-checks, so normally one client writes.
+    if (r.match.aggUid !== r.uid) {
+      await new Promise(res => setTimeout(res, 1500 * TS()));
+      if (R !== r || !r.match || r.match.status !== 'playing') return;
+    }
     await F.runTransaction(db, async tx => {
       const s = await tx.get(r.mref); if (!s.exists() || s.data().status !== 'playing') return;
       const patch = { status, endedAt: F.serverTimestamp() };
