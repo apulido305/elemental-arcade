@@ -550,7 +550,8 @@ function tileCore(it,o){
   const pre=h.sym||h.pre?'':esc(it.pre);
   const post=h.sym||h.post?'':esc(it.post);
   const nm=h.name?'<span style="opacity:.38;letter-spacing:3px">? ? ?</span>':esc(it.name);
-  const mass=h.mass?'<span style="opacity:.38">?.???</span>':esc(it.mass);
+  // Isotope tiles show the mass number (the superscript before the symbol), not the element's average atomic mass.
+  const mass=it.cat==='iso'||it.kind==='Isotope'?'Mass no. '+(h.mass?'<span style="opacity:.38">?</span>':esc(it.pre)):h.mass?'<span style="opacity:.38">?.???</span>':esc(it.mass);
   const flat=!!o.flat;
   return '<div class="tile" style="width:212px;height:108px;flex:none;box-sizing:border-box;'+(flat?'border:0;background:none;padding:0':'border:2px solid '+c.dark+';border-radius:4px;background:linear-gradient(135deg,'+c.dark+','+c.mid+' 55%,'+c.dark+');padding:8px')+'">'+
   '<div style="position:relative;width:100%;height:100%;box-sizing:border-box;'+(flat?'background:rgba(255,255,255,.34);border:1.5px solid rgba(255,255,255,.8);border-radius:6px;text-shadow:0 0 5px rgba(255,255,255,.9)':'background:linear-gradient('+c.light+','+c.mid+');border:1px solid '+c.dark)+';font-family:\'Lilita One\',sans-serif;color:#000">'+
