@@ -3,36 +3,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, PHONE, DESKTOP } from '../helpers/fixtures.js';
+import { layoutProblems } from '../helpers/layout.js';
 import { hostArena, joinByCode, openVs, startMatch, correctIndexes, playMatch, scriptedPlay, seatKids } from '../helpers/vs.js';
 
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'vs-arena');
 const NAMES = ['maya', 'jordan', 'priya', 'devon', 'sam', 'lena', 'omar', 'zoe', 'caleb', 'tessa'];
 
-/** Problems a teacher would notice on a phone: sideways scroll, tiny tap targets, text spilling out of its box. */
-async function layoutProblems(page) {
-  return page.evaluate(() => {
-    const out = [], vs = document.getElementById('vs');
-    if (document.documentElement.scrollWidth > innerWidth + 1) out.push('page scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + innerWidth);
-    if (vs && !vs.hidden && vs.scrollWidth > vs.clientWidth + 1) out.push('overlay scrolls sideways: ' + vs.scrollWidth + ' > ' + vs.clientWidth);
-    const vis = e => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
-    if (vs && !vs.hidden) {
-      vs.querySelectorAll('button, select, input:not([type=checkbox]):not([type=hidden]), label.vs-chk, a[href]').forEach(e => {
-        if (!vis(e) || e.disabled && false) return;
-        const r = e.getBoundingClientRect();
-        if (r.height < 43.5) out.push('tap target ' + Math.round(r.height) + 'px: ' + (e.dataset.vs || e.className || e.tagName) + ' "' + (e.textContent || '').trim().slice(0, 20) + '"');
-      });
-      vs.querySelectorAll('h1, h2, h3, .vs-plate, .vs-pod .nm, .vs-lobbyrow b, .vs-bigcode, .vs-rankchip, .vs-lrow .nm').forEach(e => {
-        if (!vis(e)) return;
-        const cs = getComputedStyle(e);
-        // ellipsis on ladder names is intended; anything else that overflows its box is clipped text
-        if (cs.textOverflow === 'ellipsis') return;
-        if (e.scrollWidth > e.clientWidth + 2 && cs.overflowX !== 'visible') out.push('clipped text: ' + e.textContent.trim().slice(0, 30));
-        const r = e.getBoundingClientRect(); if (r.right > innerWidth + 1 || r.left < -1) out.push('off screen: ' + e.textContent.trim().slice(0, 30));
-      });
-    }
-    return out;
-  });
-}
 const shot = async (page, name, w, opts = {}) => {
   const file = path.join(OUT, `${name}-${w}.png`);
   await page.screenshot({ path: file, ...opts });
@@ -141,5 +117,29 @@ for (const w of [PHONE, DESKTOP]) {
       expect(arena.backend.denials, JSON.stringify(arena.backend.denials.slice(0, 3))).toEqual([]);
       expect(me.errors).toEqual([]);
     });
+  });
+}
+
+// Spec change 7: a full 20-player lobby on a phone (2-column rows with icons, host first, tags never wrap).
+for (const w of [PHONE, DESKTOP]) {
+  test(`lobby with 20 players and icons fits (${w})`, async ({ arena }) => {
+    test.setTimeout(120000);
+    const host = await arena.device({ width: w, fonts: true });
+    await host.goto('/'); await host.signUp('period3', 'mrpulido');
+    await host.page.evaluate(() => Arcade.setIcon('crown'));
+    const code = await hostArena(host, { cap: 20 });
+    const names = ['maya', 'jordan', 'priya', 'devon', 'sam', 'lena', 'omar', 'zoe', 'caleb', 'tessa', 'alexandria', 'benjamin', 'chris', 'dani'];
+    await seatKids(arena, code, names, { guests: 5 });
+    await expect(host.page.locator('[data-vs="lobby-players"] li')).toHaveCount(20);
+    await expect(host.page.locator('#vs-count')).toHaveText('20/20');
+    await expect(host.page.locator('[data-vs="lobby-players"] li').first()).toContainText('Host');
+    expect(await layoutProblems(host.page)).toEqual([]);
+    const rows = await host.page.locator('[data-vs="lobby-players"] li').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+    for (const h of rows) expect(h).toBeGreaterThanOrEqual(44);
+    // the code reads as two groups of three and stays on one line
+    const code1 = await host.page.locator('[data-vs="code"]').evaluate(e => ({ lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || getComputedStyle(e).fontSize)), text: e.textContent }));
+    expect(code1.text).toBe(code);
+    await shotTall(host, 'lobby-20', w);
+    expect(host.errors).toEqual([]);
   });
 }

@@ -29,7 +29,7 @@ sup{font-size:.62em;line-height:0}
 
 /* top bar */
 .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-bottom:16px}
-.logo{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.logo{display:flex;align-items:center;gap:10px;min-height:44px;background:none;border:0;padding:0;cursor:pointer;text-align:left}
 .logo b{display:block;font:400 24px/1 var(--display);letter-spacing:2.5px;color:#fff}
 .logo small{display:block;margin-top:3px;font:700 9px/1 var(--body);letter-spacing:3px;color:var(--gold)}
 .trainer{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -38,7 +38,7 @@ sup{font-size:.62em;line-height:0}
 .lvl span b{font:400 15px/1 var(--display);color:var(--gold);letter-spacing:.5px;margin-right:6px}
 .xp{height:10px;border-radius:6px;background:var(--bg0);border:2px solid var(--line);overflow:hidden}
 .xp i{display:block;height:100%;background:var(--gold);border-radius:4px}
-.iconbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);box-shadow:0 3px 0 var(--shadow);cursor:pointer;font:700 14px/1 var(--body)}
+.iconbtn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);box-shadow:0 3px 0 var(--shadow);cursor:pointer;font:700 14px/1 var(--body)}
 .iconbtn b{font:400 16px/1 var(--display);color:var(--gold)}
 .iconbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--shadow)}
 
@@ -179,7 +179,7 @@ h1,h2,h3{margin:0;font-weight:400}
 .chk input{width:20px;height:20px;margin:1px 0 0;accent-color:#f3dd7a;flex:none}
 .err{margin:14px 0 0;padding:10px 14px;border-radius:12px;background:rgba(217,83,79,.16);border:2px solid var(--bad);color:#fff}
 .btn[disabled]{opacity:.6;cursor:default}
-@media (max-width:520px){.trainer{flex:1 1 100%;margin-left:0;gap:8px}.lvl{min-width:0;flex:1 1 100%}.iconbtn{padding:6px 10px;min-height:38px;gap:6px;white-space:nowrap}}
+@media (max-width:520px){.trainer{gap:8px}.iconbtn{padding:6px 10px;gap:6px;white-space:nowrap}}
 /* card levels */
 .foil{position:absolute;inset:0;border-radius:16px;pointer-events:none;mix-blend-mode:overlay;opacity:1;background:linear-gradient(115deg,rgba(255,255,255,0) 18%,rgba(255,60,170,.75) 31%,rgba(255,225,50,.75) 41%,rgba(40,255,190,.75) 51%,rgba(70,130,255,.75) 61%,rgba(200,70,255,.75) 71%,rgba(255,255,255,0) 84%);background-size:260% 260%;background-position:var(--hx,35%) var(--hy,35%)}
 .foil::after{content:'';position:absolute;inset:0;border-radius:16px;mix-blend-mode:normal;background:inherit;opacity:.22}
@@ -208,7 +208,7 @@ h1,h2,h3{margin:0;font-weight:400}
 @keyframes pulse{50%{transform:scale(1.2)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 main.enter>*{animation:fadeIn .3s backwards}
-.enter .room{animation:rise .4s backwards;animation-delay:calc(var(--i,0)*45ms + 100ms)}
+.enter .rooms.stag .room{animation:fadeIn .3s backwards;animation-delay:calc(var(--i,0)*25ms)}
 .enter .cell,.enter .slot{animation:fadeIn .35s backwards;animation-delay:calc(var(--i,0)*14ms)}
 .enter .flip{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) backwards;animation-delay:calc(var(--i,0)*.12s + .35s)}
 .enter .stat{animation:rise .4s backwards}
@@ -235,6 +235,136 @@ main.enter>*{animation:fadeIn .3s backwards}
 .vsbtn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--shadow)}
 .vsrec{font:400 18px/1 var(--mono);color:var(--cream)}
 .vsoff{margin:0 0 16px;color:var(--mute);font-size:14px}
+
+/* profile icons (preset SVGs only) */
+.av{display:inline-flex;flex:none;width:var(--s,28px);height:var(--s,28px)}
+.av svg{width:100%;height:100%;display:block}
+.av.tile{background:var(--bg0);border-radius:10px;padding:calc(var(--s,28px)*.08)}
+
+/* top bar: row 1 logo + avatar + sound, row 2 icon + level + binder */
+.top{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}
+.toprow{display:flex;align-items:center;gap:10px;min-width:0}
+.toprow .logo{flex:none}
+.avbtn{min-width:0}
+.toprow .logo{margin-right:auto}
+.avbtn{display:inline-flex;align-items:center;gap:8px;min-height:44px;max-width:60vw;padding:6px 12px 6px 8px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);box-shadow:0 3px 0 var(--shadow);cursor:pointer;font:700 14px/1 var(--body)}
+.avbtn .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel.picker,.stickybar.picker{max-width:760px}
+.avbtn:active,.sndbtn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--shadow)}
+.gtag{flex:none;font:700 10px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;padding:3px 6px;border-radius:6px;background:var(--bg0);border:1px solid var(--line);color:var(--mute)}
+.sndbtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border-radius:12px;background:var(--panel2);border:2px solid var(--line);box-shadow:0 3px 0 var(--shadow);cursor:pointer;color:var(--gold)}
+.sndbtn svg{width:24px;height:24px}
+.sndbtn[aria-pressed="false"]{color:var(--mute)}
+.trainer{margin-left:0;flex-wrap:nowrap;gap:10px}
+.icobtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border-radius:12px;background:var(--bg0);border:2px solid var(--line);cursor:pointer}
+.icobtn:hover{border-color:var(--gold)}
+.trainer .lvl{flex:1 1 auto;min-width:0}
+.trainer .lvl span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trainer .iconbtn{flex:none;white-space:nowrap}
+/* wide screens: one row, logo | level | binder | avatar | sound */
+@media (min-width:700px){.top{flex-direction:row;align-items:center;gap:12px}.toprow{display:contents}.toprow .logo{order:0;margin-right:12px}.trainer{order:1;flex:1 1 auto;max-width:620px;margin-right:auto}.avbtn{order:2}.sndbtn{order:3}}
+
+/* guest notice */
+.notice{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--panel);border:2px dashed var(--line);font-size:15px;animation:fadeIn .12s backwards}
+.notice p{margin:0;flex:1 1 220px;min-width:0}
+.notice .acts{display:flex;gap:8px;flex:none}
+.xbtn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border-radius:12px;border:2px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--mute);font:700 20px/1 var(--body)}
+
+/* play now */
+.playnow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px;padding:14px 16px;border-radius:18px;background:linear-gradient(135deg,var(--panel2),var(--panel));border:3px solid var(--gold);box-shadow:0 6px 0 var(--shadow)}
+.playnow>div{min-width:0;flex:1 1 200px}
+.playnow b{display:block;font:400 22px/1.15 var(--display);color:#fff;letter-spacing:.3px}
+.playnow .sub{margin:2px 0 0;font-size:14px}
+.playnow .btn{min-width:120px;min-height:52px;font-size:22px}
+.step{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin-right:8px;border-radius:50%;background:var(--gold);color:#241c00;font:400 18px/1 var(--display);vertical-align:3px}
+.roomstat{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);color:var(--text)}
+.roomstat:empty{display:none}
+
+/* rooms: locked and mixed */
+.room[aria-disabled="true"]{cursor:pointer;box-shadow:0 6px 0 var(--shadow)}
+.room[aria-disabled="true"] .band{background:var(--panel2)!important;justify-content:flex-start}
+.room[aria-disabled="true"] .glyph{color:var(--mute);text-shadow:none}
+.room[aria-disabled="true"] .glyph svg{width:34px;height:34px;display:block}
+.room[aria-disabled="true"] .nm{color:var(--mute)}
+.room[aria-disabled="true"]:hover{border-color:var(--line)}
+.room[aria-disabled="true"]:active{transform:none}
+.room.mixed .glyph{color:#241c00;text-shadow:none}
+
+/* answer marks */
+.opt .key svg{width:18px;height:18px;vertical-align:-3px}
+.fb h3{display:flex;align-items:center;gap:10px;scroll-margin-bottom:96px}
+.fb h3 svg{width:28px;height:28px;flex:none}
+
+/* sticky action bar (quiz Next, results, picker) */
+.stickybar{position:sticky;bottom:0;z-index:20;display:flex;gap:12px;justify-content:flex-end;margin-top:16px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:linear-gradient(rgba(11,16,48,0),var(--bg0) 14px)}
+.stickybar[data-ui="next-bar"]{animation:fadeIn .12s backwards}
+.stickybar .btn{min-height:56px;min-width:160px}
+.nextstar{margin:8px 0 0;color:var(--mute);font-size:15px}
+.nextstar b{color:var(--gold)}
+
+/* binder empty state */
+.empty{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px;padding:14px 16px;border-radius:16px;background:var(--panel);border:2px solid var(--gold)}
+.empty p{margin:0;flex:1 1 240px;min-width:0}
+
+/* account icon row */
+.acctav{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0 4px}
+.acctav>div{min-width:0}
+.acctav b{display:block;font:400 22px/1.1 var(--display);color:var(--cream)}
+
+/* icon picker */
+.pickprev{display:flex;align-items:center;gap:14px;margin:4px 0 16px}
+.pickprev b{display:block;font:400 26px/1.1 var(--display);color:#fff}
+.pickprev span{color:var(--mute)}
+.icongrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.icell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:44px;padding:8px 2px 6px;border-radius:14px;border:2px solid var(--line);background:var(--bg0);cursor:pointer;color:var(--text)}
+.icell>*{flex:none}
+.icell .av{--s:clamp(36px,12vw,64px)!important}
+/* icon follows the cell width (the same grid sits in the full picker and the narrower VS join panel) */
+@supports (width:1cqi){.icongrid{container-type:inline-size}.icell .av{--s:clamp(36px,calc(25cqi - 22px),64px)!important}@media (min-width:900px){.icell .av{--s:clamp(36px,calc(12.5cqi - 22px),64px)!important}}}
+.icell small{font:700 12px/1 var(--body);color:var(--mute);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icell:hover{border-color:var(--goldd)}
+.icell[aria-checked="true"]{outline:3px solid var(--gold);outline-offset:-3px;background:var(--panel2);border-color:var(--gold)}
+.icell[aria-checked="true"] small{color:var(--gold)}
+.icell:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+@media (min-width:900px){.icongrid{grid-template-columns:repeat(8,minmax(0,1fr))}}
+
+/* phone: tap targets, 2-column decks and rooms */
+@media (max-width:520px){
+  .iconbtn,.btn.small,.tab,.chip{min-height:44px}
+  .tab,.chip{display:inline-flex;align-items:center}
+  .panel.auth{padding:12px}
+  .decks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .deck{min-width:0}
+  .deck:last-child:nth-child(odd){grid-column:1/-1}
+  .rooms{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .room .band{min-height:56px;padding:8px 10px}
+  .room .glyph{font-size:28px}
+  .room .stars svg{width:14px;height:14px}
+  .room .body{padding:8px 10px 10px}
+  .room .nm{font-size:17px}
+  .room .ds{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .stickybar .btn{flex:1 1 0;min-width:0}
+  .playnow{flex-wrap:nowrap;padding:12px 12px 12px 14px;margin-bottom:18px}
+  .playnow>div{flex:1 1 auto}
+  .playnow b{font-size:19px}
+  .playnow .btn{min-width:96px;padding:8px 16px}
+  .notice{font-size:14px;padding:6px 6px 6px 12px;gap:8px}
+  .notice p{flex:1 1 150px}
+  .sechead .sub.hint{display:none}
+  .deck{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:6px;align-items:baseline;padding:7px 10px 8px}
+  .deck b{grid-column:1/-1}
+  .deck em{margin-top:0}
+  .room .ds{line-height:1.3}
+  .trainer .lvl span b{margin-right:4px}
+  .toprow{gap:8px}
+  .logo{gap:7px}
+  .logo svg{width:32px;height:32px}
+  .logo b{font-size:19px;letter-spacing:1.2px}
+  .logo small{font-size:8px;letter-spacing:2.4px}
+  .avbtn{gap:6px;padding:6px 8px 6px 6px}
+  .gtag{font-size:9px;padding:2px 5px}
+}
+@media (max-width:400px){.logo>span{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media (prefers-reduced-motion:reduce){.cw.anim .foil,.cw.anim .foil::after,.cw.anim .spark{animation:none}.cw{transition:none}}
 @media (prefers-reduced-motion:reduce){.flip-in{transition:none}.btn,.opt,.room,.deck{transition:none}}
@@ -295,31 +425,66 @@ const ROOMS=[
   {id:'lab',name:'Particle Lab',glyph:'p n e',desc:'Count neutrons, electrons and atoms.',theme:'Nonmetal',types:['lab']},
   {id:'mixed',name:'Mixed Pack',glyph:'★',desc:'Every question type in one round.',theme:'Blank',types:['ability','symbol','number','config','table','type','lab']}
 ];
+/* Why a room can be empty in a deck, and decks that fill it (shown when a locked room is tapped). */
+const ROOM_NEEDS={number:{needs:'element cards',decks:['s20','e118']},table:{needs:'element cards',decks:['s20','e118']},lab:{needs:'ion or isotope cards',decks:['cat','an','iso']}};
+
+/* ---------- profile icons: 16 preset SVGs (design/ux-spec.md). Stored as an id string only, never markup. ---------- */
+const ICONS=[
+  {id:'atom',label:'Atom',accent:'sky',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fdf6d8"><ellipse cx="32" cy="32" rx="26" ry="10"/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(60 32 32)"/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(120 32 32)"/></g><circle cx="32" cy="32" r="6" fill="#7fd1f0" stroke="#f3dd7a"/></svg>'},
+  {id:'bolt',label:'Bolt',accent:'gold',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M37 4 14 36h15l-4 24 25-34H35z" fill="#f3dd7a" stroke="#fdf6d8"/></svg>'},
+  {id:'beaker',label:'Beaker',accent:'good',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8v44q0 6 6 6h16q6 0 6-6V8" fill="#4caf62" stroke="#fdf6d8"/><path d="M13 8h38" stroke="#fdf6d8"/><path d="M18 20h8M18 30h6M18 40h8" stroke="#fdf6d8"/><circle cx="35" cy="44" r="2.5" stroke="#fdf6d8"/><circle cx="39" cy="36" r="2" stroke="#fdf6d8"/></svg>'},
+  {id:'crystal',label:'Crystal',accent:'good',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 8h24l14 16-26 34L6 24z" fill="#4caf62" stroke="#fdf6d8"/><path d="M6 24h52M20 8l6 16 6 34M44 8l-6 16-6 34" stroke="#fdf6d8"/></svg>'},
+  {id:'flame',label:'Flame',accent:'rose',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M32 4c4 10 16 18 16 34 0 12-7 20-16 20S16 50 16 38c0-8 4-14 8-20 2 6 4 8 6 10 2-8 0-16 2-24z" fill="#f2a8a3" stroke="#f3dd7a"/><path d="M32 54c-5 0-7-5-6-9s4-5 6-9c2 4 6 6 6 10s-3 8-6 8z" stroke="#fdf6d8"/></svg>'},
+  {id:'droplet',label:'Droplet',accent:'sky',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M32 5C32 5 14 28 14 40a18 18 0 0 0 36 0C50 28 32 5 32 5z" fill="#7fd1f0" stroke="#fdf6d8"/><path d="M24 40a8 8 0 0 0 6 9" stroke="#fdf6d8"/></svg>'},
+  {id:'magnet',label:'Magnet',accent:'rose',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8h14v26a6 6 0 0 0 12 0V8h14v26a20 20 0 0 1-40 0z" fill="#f2a8a3" stroke="#fdf6d8"/><path d="M12 20h14M38 20h14" stroke="#fdf6d8"/></svg>'},
+  {id:'moon',label:'Moon',accent:'gold',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M40 6a26 26 0 1 0 18 40A21 21 0 0 1 40 6z" fill="#f3dd7a" stroke="#fdf6d8"/></svg>'},
+  {id:'star',label:'Star',accent:'gold',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m32 5 8 19h19l-15 12 6 20-18-11-18 11 6-20L5 24h19z" fill="#f3dd7a" stroke="#fdf6d8"/></svg>'},
+  {id:'comet',label:'Comet',accent:'sky',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M34 30 8 56M28 22 8 38M42 36 26 54" stroke="#fdf6d8"/><circle cx="45" cy="21" r="11" fill="#7fd1f0" stroke="#f3dd7a"/></svg>'},
+  {id:'rocket',label:'Rocket',accent:'rose',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M32 4c10 8 14 22 12 38H20C18 26 22 12 32 4z" fill="#f2a8a3" stroke="#fdf6d8"/><path d="M20 34 10 48l10-2zM44 34l10 14-10-2z" fill="#f2a8a3" stroke="#fdf6d8"/><circle cx="32" cy="24" r="5" stroke="#fdf6d8"/><path d="M26 47l6 13 6-13" stroke="#f3dd7a"/></svg>'},
+  {id:'flask',label:'Flask',accent:'rose',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M26 6h12M28 6v16L10 52q-3 6 4 6h36q7 0 4-6L36 22V6" fill="#f2a8a3" stroke="#fdf6d8"/><circle cx="30" cy="46" r="2.5" stroke="#fdf6d8"/><circle cx="40" cy="40" r="2" stroke="#fdf6d8"/></svg>'},
+  {id:'crown',label:'Crown',accent:'gold',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 52 4-34 14 14 8-22 8 22 14-14 4 34z" fill="#f3dd7a" stroke="#fdf6d8"/><path d="M8 44h48" stroke="#fdf6d8"/></svg>'},
+  {id:'shield',label:'Shield',accent:'good',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M32 4 54 12v18c0 14-10 24-22 30C20 54 10 44 10 30V12z" fill="#4caf62" stroke="#fdf6d8"/><path d="m20 26 12 12 12-12" stroke="#fdf6d8"/></svg>'},
+  {id:'spark',label:'Spark',accent:'good',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M32 4c2 18 10 26 28 28-18 2-26 10-28 28-2-18-10-26-28-28C22 30 30 22 32 4z" fill="#4caf62" stroke="#fdf6d8"/></svg>'},
+  {id:'wave',label:'Wave',accent:'sky',svg:'<svg viewBox="0 0 64 64" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 30q10-14 20 0t20 0 16 0v22q0 6-6 6H10q-6 0-6-6z" fill="#7fd1f0" stroke="#fdf6d8"/><path d="M4 44q10-14 20 0t20 0 16 0" stroke="#fdf6d8"/></svg>'}
+];
+const ICON_IDS=ICONS.map(i=>i.id);
+const DEFAULT_ICON='atom';
+const iconOf=id=>ICON_IDS.includes(id)?id:DEFAULT_ICON;           // unknown or missing id falls back to atom
+const iconById=id=>ICONS.find(i=>i.id===iconOf(id));
+const iconSVG=(id,size,o)=>{o=o||{};const ic=iconById(id);return '<span class="av'+(o.tile?' tile':'')+'" data-icon="'+ic.id+'" style="--s:'+size+'px"'+(o.label?' role="img" aria-label="'+o.label+'"':' aria-hidden="true"')+'>'+ic.svg+'</span>'};
 
 /* ---------- save ---------- */
 const KEY='elemental-arcade-v1';
 const PKEY=KEY+'-prefs';
 const PROG=['owned','miss','xp','stars','rounds','best','vs','vsAt'];
 const VS0=()=>({w:0,l:0,streak:0,best:0,played:0});
-const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,mute:false,deck:'s20'};
+// icon: profile icon id; iconAt: when it was last picked on this device (ms), so the newer of device and account wins.
+const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,mute:false,deck:'s20',room:'mixed',icon:DEFAULT_ICON,iconAt:0};
 const readGuest=()=>{try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}return null};
 function loadGuest(){
-  Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0});
+  Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,icon:DEFAULT_ICON,iconAt:0});
   const g=readGuest();if(g)Object.assign(S,g);
   if(!DECKS.some(d=>d.id===S.deck))S.deck='s20';
+  if(!ROOMS.some(r=>r.id===S.room))S.room='mixed';
+  S.icon=iconOf(S.icon);S.iconAt=+S.iconAt||0;
 }
 loadGuest();
 const progOf=()=>{const o={};PROG.forEach(k=>o[k]=S[k]);return o};
 const applyProg=p=>{p=p||{};PROG.forEach(k=>{S[k]=p[k]!=null?p[k]:(k==='vs'?VS0():typeof S[k]==='number'?0:{})})};
 const guestCount=()=>{const g=readGuest();return g&&g.owned?Object.keys(g.owned).length:0};
 let ACCT=null;          // {nick, cls} while signed in
+const acctKey=()=>ACCT?ACCT.cls+'_'+ACCT.nick:'';
 let SYNC='';            // '', 'saving', 'saved', 'offline'
 function save(){
   try{
-    if(ACCT)localStorage.setItem(PKEY,JSON.stringify({mute:S.mute,deck:S.deck}));
+    // Signed in: the device keeps only prefs, plus the icon tagged with whose it is (shown again after a quick refresh).
+    if(ACCT)localStorage.setItem(PKEY,JSON.stringify({mute:S.mute,deck:S.deck,room:S.room,icon:S.icon,iconAt:S.iconAt,iconFor:acctKey()}));
     else localStorage.setItem(KEY,JSON.stringify(S));
   }catch(e){}
-  if(ACCT&&window.Cloud)Cloud.save(progOf());
+  if(ACCT&&window.Cloud)Cloud.save(progOf(),{icon:S.icon,iconAt:S.iconAt});
+}
+function setIcon(id){
+  S.icon=iconOf(id);S.iconAt=Date.now();save();render();
 }
 
 /* ---------- helpers ---------- */
@@ -636,7 +801,7 @@ function startRound(roomId){
 function answer(i){
   if(V.pick!=null)return;
   const q=cur();if(!q||!q.opts[i])return;
-  V.pick=i;const ok=q.opts[i].ok;V.res[V.qi]=ok;
+  V.pick=i;V.answered=true;const ok=q.opts[i].ok;V.res[V.qi]=ok;
   if(ok){
     V.streak++;V.best=Math.max(V.best,V.streak);
     V.lastPts=10+Math.min(10,Math.max(0,V.streak-2)*2);V.score+=V.lastPts;
@@ -668,13 +833,24 @@ function next(){
 }
 
 /* ---------- views ---------- */
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const CROSS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>';
+const SPK=on=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>'+(on?'<path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/>':'<path d="M16 9.5l5 5M21 9.5l-5 5"/>')+'</svg>';
 function topHTML(){
   const L=levelInfo(S.xp);const have=ownedCount(ALL);
-  return '<header class="top"><button class="logo" data-act="home" aria-label="Back to home">'+atomLogo+'<span><b>ELEMENTAL</b><small>ARCADE</small></span></button>'+
-  '<div class="trainer"><div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+(V.xpFrom==null?Math.round(L.into/L.need*100):V.xpFrom)+'%" data-w="'+Math.round(L.into/L.need*100)+'"></i></div></div>'+
-  (window.Cloud?'<button class="iconbtn" data-act="account">'+(ACCT?esc(ACCT.nick)+' <b>'+esc(ACCT.cls.toUpperCase())+'</b>':'Sign in')+'</button>':'')+
-  '<button class="iconbtn" data-act="binder" aria-label="Open card binder">Binder <b>'+have+'/'+ALL.length+'</b></button>'+
-  '<button class="iconbtn" data-act="mute" aria-pressed="'+!!S.mute+'">Sound <b>'+(S.mute?'Off':'On')+'</b></button></div></header>';
+  const av=window.Cloud?'<button class="avbtn" data-act="account">'+iconSVG(S.icon,28)+'<span class="nm">'+(ACCT?esc(ACCT.nick):'Sign in')+'</span>'+(ACCT?'':'<span class="gtag">Guest</span>')+'</button>':'';
+  return '<header class="top"><div class="toprow"><button class="logo" data-act="home" aria-label="Back to home">'+atomLogo+'<span><b>ELEMENTAL</b><small>ARCADE</small></span></button>'+av+
+  '<button class="sndbtn" data-act="mute" aria-pressed="'+!S.mute+'" aria-label="'+(S.mute?'Sound off':'Sound on')+'">'+SPK(!S.mute)+'</button></div>'+
+  '<div class="trainer"><button class="icobtn" data-act="icons" aria-label="Change profile icon">'+iconSVG(S.icon,28)+'</button>'+
+  '<div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+(V.xpFrom==null?Math.round(L.into/L.need*100):V.xpFrom)+'%" data-w="'+Math.round(L.into/L.need*100)+'"></i></div></div>'+
+  '<button class="iconbtn" data-act="binder" aria-label="Open card binder">Binder <b>'+have+'/'+ALL.length+'</b></button></div></header>';
+}
+/* Guest notice: where progress lives. Only when sign-in exists on this copy; dismissed for the session. */
+let NOTICEOFF=false;try{NOTICEOFF=sessionStorage.getItem(KEY+'-notice')==='1'}catch(e){}
+function noticeHTML(){
+  if(ACCT||!window.Cloud||NOTICEOFF)return '';
+  return '<div class="notice" data-ui="guest-notice" role="note"><p><b>Guest:</b> your cards stay on this device. Sign in to keep them on any device.</p>'+
+  '<div class="acts"><button class="btn ghost small" data-act="signin">Sign in</button><button class="xbtn" data-act="notice-x" aria-label="Dismiss">×</button></div></div>';
 }
 /* VS Arena entry (vs.js owns everything behind the button) */
 let CLOUDLATE=false;setTimeout(()=>{CLOUDLATE=true;if(V.screen==='home')render()},4000);
@@ -682,32 +858,44 @@ const vsReady=()=>!!(window.VSArena&&window.Cloud&&window.Cloud.fb);
 const vsRec=()=>{const v=S.vs||{};return 'VS '+(v.w||0)+'-'+(v.l||0)+(v.streak>0?' · streak '+v.streak:'')};
 function vsHTML(){
   if(vsReady()){
-    return '<section class="vsrow"><button class="vsbtn" data-act="vs" data-vs="vs-open">VS Arena<small>Live, up to 20 players</small></button>'+
-    (ACCT&&S.vs&&S.vs.played>0?'<span class="vsrec" data-vs="vs-record">'+esc(vsRec())+'</span>':'')+'</section>';
+    const rec=ACCT&&S.vs&&S.vs.played>0;
+    return '<section class="vsrow"><button class="vsbtn" data-act="vs" data-vs="vs-open">VS Arena<small'+(rec?' data-vs="vs-record"':'')+'>'+(rec?esc(vsRec()):'Live, up to 20 players')+'</small></button></section>';
   }
   if(window.Cloud||CLOUDLATE)return '<p class="vsoff" data-vs="vs-off">VS Arena could not load. Refresh the page to try again.</p>';
   return '';
 }
+/* The room Play now uses: the remembered one if this deck can fill it, else Mixed Pack. */
+const playRoom=()=>{const r=roomOf(S.room);return r&&roomPool(r,S.deck).length?r:roomOf('mixed')};
+const lockedMsg=r=>{const n=ROOM_NEEDS[r.id];if(!n)return r.name+' has no questions for this deck. Try another deck.';const ds=n.decks.map(id=>DECKS.find(d=>d.id===id).name);return r.name+' needs '+n.needs+'. Try '+(ds.length>1?ds.slice(0,-1).join(', ')+' or '+ds[ds.length-1]:ds[0])+'.'};
+let HOMESEEN=false;
 function homeHTML(){
-  const deck=DECKS.find(d=>d.id===S.deck);
+  const deck=DECKS.find(d=>d.id===S.deck);const pr=playRoom();
   const chips=DECKS.map(d=>{const it=deckItems(d.id);return '<button class="deck'+(d.id===S.deck?' on':'')+'" data-act="deck" data-id="'+d.id+'" aria-pressed="'+(d.id===S.deck)+'"><b>'+d.name+'</b><span>'+d.sub+'</span><em>'+ownedCount(it)+'/'+it.length+' cards</em></button>'}).join('');
-  const rooms=ROOMS.map((r,ri)=>{
-    const n=roomPool(r,S.deck).length;const c=THEMES[r.theme];const st=S.stars[r.id+'|'+S.deck]||0;
-    return '<button class="room" style="--i:'+ri+'" data-act="room" data-id="'+r.id+'"'+(n?'':' disabled')+'><div class="band" style="background:linear-gradient(135deg,'+c.dark+','+c.mid+')"><span class="glyph">'+r.glyph+'</span>'+starsHTML(st)+'</div><div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Not available in this deck.')+'</span></div></button>';
+  const list=ROOMS.map(r=>({r,n:roomPool(r,S.deck).length}));
+  const rooms=list.filter(x=>x.n).concat(list.filter(x=>!x.n)).map(({r,n},ri)=>{
+    const c=THEMES[r.theme];const st=S.stars[r.id+'|'+S.deck]||0;const mixed=r.id==='mixed';
+    const band=mixed?'linear-gradient(135deg,var(--goldd),var(--gold))':'linear-gradient(135deg,'+c.dark+','+c.mid+')';
+    const need=ROOM_NEEDS[r.id];
+    return '<button class="room'+(mixed?' mixed':'')+'" style="--i:'+ri+'" data-act="room" data-id="'+r.id+'"'+(n?'':' aria-disabled="true"')+'>'+
+      '<div class="band"'+(n?' style="background:'+band+'"':'')+'><span class="glyph">'+(n?r.glyph:lockSVG)+'</span>'+(n?starsHTML(st):'')+'</div>'+
+      '<div class="body"><span class="nm">'+r.name+'</span><span class="ds">'+(n?r.desc:'Locked: needs '+(need?need.needs:'other cards')+'.')+'</span></div></button>';
   }).join('');
-  return vsHTML()+'<section><div class="sechead"><div><h1 class="h">Pick a deck</h1><p class="sub">Every correct answer wins that card for your binder. Cards you miss come back more often.</p></div></div><div class="decks">'+chips+'</div></section>'+
-  '<section class="sec"><div class="sechead"><h2 class="h">Pick a room</h2><span class="sub" style="margin:0">Playing: <b style="color:var(--gold)">'+deck.name+'</b></span></div><div class="rooms">'+rooms+'</div></section>'+
-  '<p class="foot">Rounds are 10 questions. Progress and cards are saved on this device.</p>';
+  const stag=!HOMESEEN;HOMESEEN=true;
+  return noticeHTML()+vsHTML()+
+  '<section class="playnow" data-ui="play-now"><div><b>'+esc(deck.name)+' · '+esc(pr.name)+'</b><p class="sub">Rounds are 10 questions. Every correct answer wins that card.</p></div><button class="btn" data-act="play">Play</button></section>'+
+  '<section><div class="sechead"><div><h1 class="h"><span class="step" aria-hidden="true">1</span>Pick a deck</h1><p class="sub hint">Every correct answer wins that card for your binder. Cards you miss come back more often.</p></div></div><div class="decks">'+chips+'</div></section>'+
+  '<section class="sec"><div class="sechead"><h2 class="h"><span class="step" aria-hidden="true">2</span>Pick a room</h2><span class="sub" style="margin:0">Playing: <b style="color:var(--gold)">'+deck.name+'</b></span></div>'+
+  '<p class="roomstat" role="status" data-ui="room-status">'+esc(V.roomMsg||'')+'</p><div class="rooms'+(stag?' stag':'')+'">'+rooms+'</div></section>';
 }
 function quizHTML(){
   const q=cur();const room=roomOf(V.roomId);const done=V.pick!=null;
   const pips=V.qs.map((_,i)=>'<i class="pip '+(i<V.qi||(i===V.qi&&done)?(V.res[i]?'ok':'no'):i===V.qi?'cur':'')+(i===V.qi&&done?' new':'')+'"></i>').join('');
   const opts=q.opts.map((o,i)=>{
-    let cls='opt'+(q.mono?' mono':'');
-    if(done){if(o.ok)cls+=' right';else if(i===V.pick)cls+=' wrong';else cls+=' dim'}
-    return '<button class="'+cls+'" data-act="answer" data-i="'+i+'"'+(done?' disabled':'')+'><span class="key">'+(i+1)+'</span><span class="ot">'+o.h+'</span></button>';
+    let cls='opt'+(q.mono?' mono':''),key=String(i+1),lab='';
+    if(done){if(o.ok){cls+=' right';key=CHECK;lab=' aria-label="Option '+(i+1)+', correct"'}else if(i===V.pick){cls+=' wrong';key=CROSS;lab=' aria-label="Option '+(i+1)+', your answer, wrong"'}else cls+=' dim'}
+    return '<button class="'+cls+'" data-act="answer" data-i="'+i+'"'+(done?' disabled':'')+'><span class="key"'+lab+'>'+key+'</span><span class="ot">'+o.h+'</span></button>';
   }).join('');
-  let fb='';
+  let fb='',bar='';
   if(done){
     const ok=V.res[V.qi];const last=V.qi+1>=V.qs.length;
     const good=['Nice one!','Correct!','You got it!','Sharp!'][V.qi%4],bad=['Not quite.','Close, study this one.','Missed it.'][V.qi%3];
@@ -716,13 +904,19 @@ function quizHTML(){
     const xp=ok?'<div class="cxp"><div class="bar2" role="img" aria-label="Card XP"><i style="width:'+(V.cardFrom==null?pctNow:V.cardFrom)+'%" data-w="'+pctNow+'"></i></div><span>'+esc(q.item.name)+' card: '+(nt?cnt+' of '+nt.at+' correct to reach '+nt.n:'max level')+'</span></div>':'';
     const up=ok&&V.lastUp>=0?'<span class="win up">CARD LEVEL UP: '+TIERS[V.lastUp].n.toUpperCase()+'</span>':'';
     const showCard=!ok||V.lastUp>=0;
-    fb='<div class="fb '+(ok?'ok':'no')+'" role="status"><div class="txt"><h3>'+(ok?good:bad)+'</h3>'+q.exp+
-      (ok?'<span class="win">+'+V.lastPts+' pts'+(V.lastNew?' · NEW CARD: '+esc(q.item.name):'')+'</span>':'')+up+xp+
-      '<button class="btn" data-act="next">'+(last?'See results':'Next')+'</button></div>'+
+    fb='<div class="fb '+(ok?'ok':'no')+'" role="status"><div class="txt"><h3 class="fbh">'+(ok?CHECK:CROSS)+'<span>'+(ok?good:bad)+'</span></h3>'+q.exp+
+      (ok?'<span class="win">+'+V.lastPts+' pts'+(V.lastNew?' · NEW CARD: '+esc(q.item.name):'')+'</span>':'')+up+xp+'</div>'+
       (showCard?'<button class="cardbtn" data-act="open" data-id="'+q.item.id+'" aria-label="Enlarge the '+esc(q.item.name)+' card">'+cardHTML(q.item,Math.min(1,(Math.min(innerWidth,1080)-64)/240),tierShown(q.item.id),true,V.lastUp>=0&&ok?'levelup':'deal')+'</button>':'')+'</div>';
+    bar='<div class="stickybar" data-ui="next-bar"><button class="btn" data-act="next">'+(last?'See results':'Next')+'</button></div>';
   }
   return '<div class="hud"><button class="btn ghost small" data-act="home">Quit</button><div class="pips" aria-label="Question '+(V.qi+1)+' of '+V.qs.length+'">'+pips+'</div><div class="hudstat"><span>Score<b>'+V.score+'</b></span>'+(V.streak>=2?'<span'+(V.streak>=3?' class="hot"':'')+'>Streak<b>×'+V.streak+'</b></span>':'')+'</div></div>'+
-  '<section class="panel"><div class="qmeta">'+room.name+' · '+DECKS.find(d=>d.id===V.deckId).name+' · '+(V.qi+1)+' of '+V.qs.length+'</div><h2 class="prompt">'+q.prompt+'</h2><div class="clue">'+q.clue+'</div><div class="opts">'+opts+'</div>'+fb+'</section>';
+  '<section class="panel"><div class="qmeta">'+room.name+' · '+DECKS.find(d=>d.id===V.deckId).name+' · '+(V.qi+1)+' of '+V.qs.length+'</div><h2 class="prompt">'+q.prompt+'</h2><div class="clue">'+q.clue+'</div><div class="opts">'+opts+'</div>'+fb+'</section>'+bar;
+}
+/* Same thresholds as next(): 3 stars at 90%, 2 at 70%, 1 at 50%. */
+function nextStarHTML(){
+  if(V.stars>=3)return '';
+  const n=V.qs.length,k=Math.ceil([.5,.7,.9][V.stars]*n-1e-9);
+  return '<p class="nextstar" data-ui="next-star">Next star: <b>'+k+' of '+n+'</b> correct</p>';
 }
 function resultsHTML(){
   const correct=V.res.filter(Boolean).length;
@@ -730,17 +924,17 @@ function resultsHTML(){
   const lv=V.lvAfter>V.lvBefore?'<div class="lvup">Level up! You are now Lv '+V.lvAfter+', '+esc(levelInfo(S.xp).title)+'.</div>':'';
   const pw=Math.max(150,Math.min(240,Math.floor((Math.min(innerWidth,1080)-32-16)/2)));
   const pack=V.newIds.length?
-    '<section><div class="sechead"><h2 class="h">New cards won</h2><div class="actions"><button class="btn small" data-act="flipall">Flip all</button></div></div><div class="pack" style="--pw:'+pw+'px">'+
+    '<section><div class="sechead"><h2 class="h">New cards won</h2><div class="actions"><button class="btn small" data-act="flipall">Flip all</button><button class="btn ghost small" data-act="binder">See in binder</button></div></div><div class="pack" style="--pw:'+pw+'px">'+
     V.newIds.map((id,ni)=>{const it=BY[id];const s=pw/240;return '<button class="flip'+(V.flipped[id]?' on':'')+'" data-act="flip" data-id="'+id+'" style="--i:'+ni+';width:'+pw+'px;height:'+Math.round(336*s)+'px" aria-label="Flip card"><div class="flip-in"><div class="face back">'+'<div class="cw" style="--cs:'+s+'">'+backInner()+'</div></div><div class="face front">'+cardHTML(it,s,tierShown(id))+'</div></div></button>'}).join('')+'</div></section>':
     '<p class="sub">No new cards this round. Try another room or deck to find more.</p>';
   const upm={};V.ups.forEach(u=>{upm[u.id]=Math.max(upm[u.id]||0,u.tier)});
   const upids=Object.keys(upm);
   const upsec=upids.length?'<section><div class="sechead"><h2 class="h">Cards that leveled up</h2></div><div class="ups" style="--pw:'+pw+'px">'+upids.map(id=>{const it=BY[id];const s=pw/240;return '<div class="cell"><button class="cardbtn" data-act="open" data-id="'+id+'" aria-label="'+esc(it.name)+'">'+cardHTML(it,s,upm[id],true,'levelup')+'</button><span class="tcap">'+TIERS[upm[id]].n+'</span></div>'}).join('')+'</div></section>':'';
   const missed=V.missed.length?'<section><h2 class="h" style="font-size:22px">Review these</h2><p class="sub">Tap a name to see its card.</p><div class="chips" style="margin-top:10px">'+V.missed.map(id=>'<button class="chip" data-act="open" data-id="'+id+'">'+esc(BY[id].name)+'</button>').join('')+'</div></section>':'';
-  return '<div class="res"><section class="panel"><div class="qmeta">'+roomOf(V.roomId).name+' · '+DECKS.find(d=>d.id===V.deckId).name+'</div><h1 class="prompt" style="margin-bottom:10px">'+title+'</h1>'+starsHTML(V.stars,true)+
+  return (S.rounds>0?noticeHTML():'')+'<div class="res"><section class="panel"><div class="qmeta">'+roomOf(V.roomId).name+' · '+DECKS.find(d=>d.id===V.deckId).name+'</div><h1 class="prompt" style="margin-bottom:10px">'+title+'</h1>'+starsHTML(V.stars,true)+nextStarHTML()+
   '<div class="stats" style="margin-top:16px"><div class="stat"><span>Correct</span><b data-count="'+correct+'" data-post="/'+V.qs.length+'">'+correct+'/'+V.qs.length+'</b></div><div class="stat"><span>Score</span><b data-count="'+V.score+'">'+V.score+'</b></div><div class="stat"><span>XP earned</span><b data-count="'+V.xpGain+'" data-pre="+">+'+V.xpGain+'</b></div><div class="stat"><span>Best streak</span><b data-count="'+V.best+'" data-pre="×">×'+V.best+'</b></div></div>'+
-  (V.perfect?'<p class="sub" style="margin-top:12px">Perfect round bonus: +20 XP.</p>':'')+'</section>'+lv+upsec+pack+missed+
-  '<div class="actions"><button class="btn" data-act="again">Play again</button><button class="btn ghost" data-act="home">Pick a room</button><button class="btn ghost" data-act="binder">Open binder</button></div></div>';
+  (V.perfect?'<p class="sub" style="margin-top:12px">Perfect round bonus: +20 XP.</p>':'')+'</section>'+lv+upsec+pack+missed+'</div>'+
+  '<div class="stickybar" data-ui="results-bar"><button class="btn ghost" data-act="home">Pick a room</button><button class="btn" data-act="again">Play again</button></div>';
 }
 function binderHTML(){
   const tabs=[['all','All',ALL]].concat(CATS.map(([k,n])=>[k,n,ALL.filter(x=>x.cat===k)]));
@@ -751,8 +945,9 @@ function binderHTML(){
     if(S.owned[it.id]){const t=tierShown(it.id);return '<div class="cell" '+ix+'><button class="cardbtn" data-act="open" data-id="'+it.id+'" aria-label="'+esc(it.name)+', '+TIERS[t].n+'">'+cardHTML(it,.4583,t)+'</button><span class="tcap">'+TIERS[t].n+'<em>'+'●'.repeat(t+1)+'<u>'+'●'.repeat(4-t)+'</u></em></span></div>'}
     return '<div class="slot" '+ix+' aria-label="Locked card"><b>'+(it.cat==='el'?it.zn:'#'+it.id.replace(/\D/g,''))+'</b>'+lockSVG+'<span>LOCKED</span></div>';
   }).join('');
+  const empty=have?'':'<div class="empty" data-ui="binder-empty"><p>Your binder is empty. Win a card by answering correctly in any room.</p><button class="btn" data-act="play">Play now</button></div>';
   return '<div class="sechead"><div><h1 class="h">Card binder</h1><div class="bar" role="img" aria-label="'+have+' of '+ALL.length+' cards"><i style="width:'+Math.round(have/ALL.length*100)+'%"></i></div><p class="sub">'+have+' of '+ALL.length+' cards collected. Tap a card to enlarge it.</p></div><button class="btn ghost small" data-act="home">Back to rooms</button></div>'+
-  '<div class="tabs" role="tablist" style="margin-bottom:18px">'+tabHTML+'</div><div class="grid">'+cells+'</div>';
+  empty+'<div class="tabs" role="tablist" style="margin-bottom:18px">'+tabHTML+'</div><div class="grid">'+cells+'</div>';
 }
 function modalHTML(){
   const it=BY[V.modal];if(!it)return '';
@@ -762,10 +957,11 @@ function modalHTML(){
   return '<div class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-label="'+esc(it.name)+' card"><div data-stop="1">'+cardHTML(it,s,t,true)+'</div><div class="meta">'+info+'</div><button class="btn small" data-act="closemodal">Close</button></div>';
 }
 const SYNCTXT={saving:'Saving…',saved:'Saved to your account',offline:'Could not reach the server. Your progress will save when you are back online.'};
+const acctIconHTML=()=>'<div class="acctav" data-ui="account-icon">'+iconSVG(S.icon,64)+'<div><b>'+iconById(S.icon).label+'</b><button class="btn ghost small" data-act="icons" style="margin-top:6px">Change icon</button></div></div>';
 function accountHTML(){
   if(ACCT){
-    return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Signed in as '+esc(ACCT.nick)+'</h1>'+
-    '<p class="sub">Class code <b style="color:var(--gold)">'+esc(ACCT.cls.toUpperCase())+'</b>. Your binder, level and stars are saved to your account, so they follow you to any device.</p>'+
+    return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Signed in as '+esc(ACCT.nick)+'</h1>'+acctIconHTML()+
+    '<p class="sub">Class code <b style="color:var(--gold)">'+esc(ACCT.cls.toUpperCase())+'</b>. Your binder, level, stars and icon are saved to your account, so they follow you to any device.</p>'+
     (S.vs&&S.vs.played>0?'<p class="sub" data-vs="vs-record">VS record: <b style="color:var(--gold)">'+(S.vs.w||0)+'-'+(S.vs.l||0)+'</b> · streak '+(S.vs.streak||0)+' · best streak '+(S.vs.best||0)+' · '+S.vs.played+' played</p>':'')+
     '<p class="sub" id="syncmsg" role="status" style="margin-top:10px">'+(SYNCTXT[SYNC]||'')+'</p>'+
     '<div class="actions" style="margin-top:18px"><button class="btn" data-act="home">Keep playing</button><button class="btn ghost" data-act="signout">Sign out</button></div></section>';
@@ -773,6 +969,7 @@ function accountHTML(){
   const f=V.form,up=V.authTab==='up';
   const bring=up&&guestCount()>0?'<label class="chk"><input type="checkbox" id="f-bring" '+(f.bring?'checked':'')+'> Add the '+guestCount()+' card'+(guestCount()>1?'s':'')+' already on this device to my account</label>':'';
   return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Save your binder</h1>'+
+  '<p class="sub" data-ui="device-summary">On this device: '+guestCount()+' card'+(guestCount()===1?'':'s')+', Lv '+levelInfo(S.xp).lvl+'.</p>'+acctIconHTML()+
   '<p class="sub">Sign in with your class code, a nickname and a PIN. No email needed. Use a nickname, not your real name.</p>'+
   '<div class="tabs" role="tablist" style="margin:14px 0"><button class="tab'+(up?'':' on')+'" data-act="authtab" data-id="in">Sign in</button><button class="tab'+(up?' on':'')+'" data-act="authtab" data-id="up">New account</button></div>'+
   '<form id="authform" autocomplete="off"><div class="fields">'+
@@ -783,10 +980,28 @@ function accountHTML(){
   (V.authErr?'<p class="err" role="alert">'+esc(V.authErr)+'</p>':'')+
   '<div class="actions" style="margin-top:16px"><button class="btn" type="submit"'+(V.authBusy?' disabled':'')+'>'+(V.authBusy?'Working…':up?'Create account':'Sign in')+'</button><button class="btn ghost" type="button" data-act="home">Play as guest</button></div></form></section>';
 }
+/* Icon picker. The grid markup is shared with the VS join screen (vs.js passes its own data-vs attribute). */
+function iconGridHTML(sel,attr){
+  sel=iconOf(sel);
+  return '<div class="icongrid" role="radiogroup" aria-label="Profile icon">'+ICONS.map(ic=>{const on=ic.id===sel;
+    return '<button type="button" class="icell" role="radio" aria-checked="'+on+'" tabindex="'+(on?0:-1)+'" '+attr+' data-id="'+ic.id+'" aria-label="'+ic.label+'">'+iconSVG(ic.id,64)+'<small aria-hidden="true">'+ic.label+'</small></button>'}).join('')+'</div>';
+}
+function iconsHTML(){
+  const sel=iconOf(V.iconSel),ic=iconById(sel);
+  return '<section class="panel auth picker" data-ui="picker"><div class="qmeta">Profile icon</div><h1 class="prompt">Pick your icon</h1>'+
+  '<div class="pickprev">'+iconSVG(sel,64)+'<div><b data-ui="pick-label">'+ic.label+'</b><span>'+(ACCT?esc(ACCT.nick):'Guest')+'</span></div></div>'+
+  iconGridHTML(sel,'data-act="icon-pick"')+'</section>'+
+  '<div class="stickybar picker" data-ui="picker-bar"><button class="btn ghost" data-act="icon-cancel">Cancel</button><button class="btn" data-act="icon-use"'+(sel===S.icon?' disabled':'')+'>Use this</button></div>';
+}
 function render(){
-  const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():V.screen==='account'?accountHTML():binderHTML();
+  const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():V.screen==='account'?accountHTML():V.screen==='icons'?iconsHTML():binderHTML();
   app.innerHTML=topHTML()+'<main'+(V.anim?' class="enter"':'')+'>'+body+'</main>'+(V.modal?modalHTML():'');
-  if(V.screen==='quiz'&&V.pick!=null){const nb=app.querySelector('[data-act="next"]');if(nb)nb.focus()}
+  if(V.screen==='quiz'&&V.pick!=null){
+    const nb=app.querySelector('[data-act="next"]');if(nb)nb.focus({preventScroll:true});
+    if(V.answered){const h=app.querySelector('.fbh');if(h&&h.scrollIntoView)h.scrollIntoView({block:'nearest',behavior:RM.matches?'auto':'smooth'})}
+  }
+  V.answered=false;
+  if(V.screen==='icons'&&V.iconFocus){const b=app.querySelector('[data-act="icon-pick"][data-id="'+V.iconFocus+'"]');if(b)b.focus({preventScroll:true});V.iconFocus=null}
   afterRender();
 }
 const RM=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
@@ -831,14 +1046,26 @@ app.addEventListener('click',e=>{
   const t=e.target.closest('[data-act]');if(!t)return;
   const a=t.dataset.act,id=t.dataset.id;
   if(a==='closemodal'){V.modal=null;render();return}
-  if(a==='deck'){S.deck=id;V.deckId=id;save();render()}
-  else if(a==='room')startRound(id);
+  if(a==='deck'){S.deck=id;V.deckId=id;V.roomMsg='';save();render()}
+  else if(a==='room'){
+    if(t.getAttribute('aria-disabled')==='true'){V.roomMsg=lockedMsg(roomOf(id));const st=app.querySelector('[data-ui="room-status"]');if(st)st.textContent=V.roomMsg;return}
+    V.roomMsg='';S.room=id;save();startRound(id);
+  }
+  else if(a==='play'){V.roomMsg='';startRound(playRoom().id)}
+  else if(a==='icons'){if(V.screen!=='icons'){V.iconBack=V.screen;V.iconSel=S.icon}V.anim='screen';V.screen='icons';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='icon-pick'){V.iconSel=iconOf(id);V.iconFocus=V.iconSel;render()}
+  else if(a==='icon-use'||a==='icon-cancel'){
+    V.anim='screen';V.screen=V.iconBack||'home';
+    if(a==='icon-use'&&iconOf(V.iconSel)!==S.icon)setIcon(V.iconSel);else render();
+    window.scrollTo(0,0);
+  }
+  else if(a==='notice-x'){NOTICEOFF=true;try{sessionStorage.setItem(KEY+'-notice','1')}catch(x){}render()}
   else if(a==='answer')answer(+t.dataset.i);
   else if(a==='next')next();
   else if(a==='home'){V.anim='screen';V.screen='home';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='binder'){V.anim='screen';V.screen='binder';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='tab'){V.tab=id;V.anim='screen';render()}
-  else if(a==='account'){V.anim='screen';V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
+  else if(a==='account'||a==='signin'){V.anim='screen';V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='authtab'){V.authTab=id;V.authErr='';render()}
   else if(a==='signout'){Cloud.signOut()}
   else if(a==='vs'){if(window.VSArena)window.VSArena.open()}
@@ -850,6 +1077,12 @@ app.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&V.modal){V.modal=null;render();return}
+  // Icon picker radiogroup (here and in the VS overlay): arrows move and select, wrapping. Space/Enter are native clicks.
+  const rd=e.target&&e.target.closest&&e.target.closest('.icongrid [role="radio"]');
+  if(rd&&/^Arrow(Left|Right|Up|Down)$/.test(e.key)){
+    const all=[...rd.closest('.icongrid').querySelectorAll('[role="radio"]')],k=all.indexOf(rd),d=/Left|Up/.test(e.key)?-1:1;
+    e.preventDefault();all[(k+d+all.length)%all.length].click();return;
+  }
   if(V.screen==='quiz'&&V.pick==null&&/^[1-4]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey){const i=+e.key-1;if(cur()&&cur().opts[i])answer(i)}
 });
 /* ---------- accounts (only when cloud.js is present and configured) ---------- */
@@ -876,7 +1109,7 @@ app.addEventListener('submit',async e=>{
   try{
     if(up){
       const bring=f.bring&&guestCount()>0;const g=bring?readGuest():null;
-      await Cloud.signUp(c,n,pin,f.keep,g?{owned:g.owned||{},miss:g.miss||{},stars:g.stars||{},xp:g.xp||0,rounds:g.rounds||0,best:g.best||0}:null);
+      await Cloud.signUp(c,n,pin,f.keep,g?{owned:g.owned||{},miss:g.miss||{},stars:g.stars||{},xp:g.xp||0,rounds:g.rounds||0,best:g.best||0}:null,S.icon);
       if(bring){try{localStorage.removeItem(KEY)}catch(x){}}
     }else await Cloud.signIn(c,n,pin,f.keep);
     V.form.pin='';
@@ -892,11 +1125,17 @@ app.addEventListener('submit',async e=>{
 });
 function wireCloud(){
   Cloud.onStatus(s=>{SYNC=s;const m=document.getElementById('syncmsg');if(m)m.textContent=SYNCTXT[s]||''});
-  Cloud.onChange((user,prog)=>{
+  // meta: {icon, updated} from the player doc. The icon picked most recently wins: this device's (if it is this
+  // account's and newer than the doc, e.g. a refresh before the debounced save) or the account's.
+  Cloud.onChange((user,prog,meta)=>{
     if(user){
       ACCT={nick:user.nick,cls:user.cls};
-      try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck}}catch(e){}
+      let mine=null;
+      try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck;if(ROOMS.some(r=>r.id===p.room))S.room=p.room;if(p.iconFor===acctKey())mine=p}}catch(e){}
+      const m=meta||{},local=mine&&+mine.iconAt>(+m.updated||0);
+      S.icon=iconOf(local?mine.icon:m.icon);S.iconAt=local?+mine.iconAt:0;
       applyProg(prog);
+      if(local)save();
       if(V.screen==='account'||V.screen==='quiz'||V.screen==='results')V.screen='home';
       V.modal=null;render();
     }else if(ACCT){
@@ -917,13 +1156,14 @@ addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(V.screen!=
 /* Hooks for vs.js (VS Arena). Solo play does not depend on any of this. */
 window.Arcade={S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
+  ICONS,ICON_IDS,iconOf,iconSVG,iconGridHTML,setIcon,getIcon:()=>S.icon,
   goto:scr=>{V.anim='screen';V.screen=scr;V.authErr='';V.modal=null;render();window.scrollTo(0,0)},
   burst:(x,y,n,spread,cols)=>{if(!RM.matches)burst(x,y,n,spread,cols||['#f3dd7a','#7fd1f0','#f2a8a3','#fdf6d8','#4caf62'])}};
 render();
 </script>
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
-<script type="module" src="cloud.js?v=2"></script>
-<script type="module" src="vs.js?v=2"></script>
+<script type="module" src="cloud.js?v=3"></script>
+<script type="module" src="vs.js?v=3"></script>
 </body>
 </html>

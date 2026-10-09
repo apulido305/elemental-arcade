@@ -72,6 +72,8 @@ test('host + 3 clients (lobby, code, guest): same questions, different speeds, t
   // timeout scores 0: no answer doc for kid q5, 9 answers total; breakdown says No answer
   expect(answers.find(a => a.id === `${uk}_5`)).toBeUndefined();
   expect(answers.filter(a => a.id.startsWith(uk + '_')).length).toBe(9);
+  // phones start with the breakdown closed (podium page stays short); open it like a student would
+  if (!(await kid.page.locator('[data-vs="answers"]').evaluate(d => d.open))) await kid.page.locator('[data-vs="answers"] summary').click();
   await expect(kid.page.locator('[data-vs="breakdown"] tbody tr').nth(5)).toContainText('No answer');
   await expect(kid.page.locator('[data-vs="breakdown"] tbody tr').nth(2)).toContainText('Wrong');
   expect(await kid.page.locator('[data-vs="breakdown"] tbody tr').nth(5).locator('td').nth(3).innerText()).toBe('0');
@@ -121,7 +123,7 @@ test('host + 3 clients (lobby, code, guest): same questions, different speeds, t
   expect(await guest.currentUser()).toMatchObject({ isAnonymous: true });
   await kid.page.locator('[data-vs="rematch-join"]').click();                              // one tap for a signed-in player
   await expect(kid.page.locator('[data-vs="code"]')).toHaveText(code2);
-  await expect(host.page.locator('#vs-count')).toHaveText('(2 / 20)');
+  await expect(host.page.locator('#vs-count')).toHaveText('2/20');
   await guest.page.locator('[data-vs="rematch-join"]').click();                           // a guest may choose to come back
   await expect(guest.page.locator('[data-vs="code"]')).toHaveText(code2);
   expect(arena.backend.adminGet('matches/' + code).status).toBe('done');                  // old match stays done

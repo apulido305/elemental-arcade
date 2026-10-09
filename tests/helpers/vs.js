@@ -42,7 +42,10 @@ export async function joinFromLobby(dev, code) {
 export async function startMatch(host, players = 2) {
   const btn = host.page.locator('[data-vs="start"]');
   await expect(btn).toBeEnabled();
+  const code = (await host.page.locator('[data-vs="code"]').textContent()).trim();
   await btn.click();
+  // wait for the shared clock to land, so scripted players that read startAt right after this see it
+  await expect.poll(() => host.arena.backend.adminGet('matches/' + code)?.startAt ?? null, { timeout: 10000 }).not.toBeNull();
 }
 export const errorText = dev => dev.page.locator('[data-vs="error"]:not([hidden])');
 
@@ -107,11 +110,16 @@ export function scriptedPlay(arena, code, players, { questions = 10 } = {}) {
   return { done, errors, cancel: () => timers.forEach(clearTimeout) };
 }
 
-/** Scripted signed-in classmates seated in an open lobby. */
-export async function seatKids(arena, code, names, { cls = 'class1', guests = 0 } = {}) {
-  const out = [];
-  for (const n of names) { const c = arena.client(n); await c.signUp(cls, n); await c.join(code); out.push(c); }
-  const GN = ['Swift Neon', 'Calm Cobalt', 'Brave Argon', 'Keen Zinc', 'Jolly Iron', 'Sunny Radon'];
-  for (let i = 0; i < guests; i++) { const g = arena.client('guest' + i); await g.signInGuest(GN[i]); await g.join(code); out.push(g); }
+export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
+
+/** Scripted signed-in classmates seated in an open lobby. Each seat gets a different profile icon (icons: false for none). */
+export async function seatKids(arena, code, names, { cls = 'class1', guests = 0, icons = true } = {}) {
+  const out = []; let k = 1;
+  const extra = () => (icons ? { playerExtra: { icon: ICON_IDS[k++ % ICON_IDS.length] } } : {});
+  // 3 ms apart so every joinedAt is distinct (in-process joins can land in the same millisecond; join order breaks ties)
+  const gap = () => new Promise(r => setTimeout(r, 3));
+  for (const n of names) { const c = arena.client(n); await c.signUp(cls, n); await c.join(code, extra()); out.push(c); await gap(); }
+  const GN = ['Swift Neon', 'Calm Cobalt', 'Brave Argon', 'Keen Zinc', 'Jolly Iron', 'Sunny Radon', 'Bold Boron', 'Witty Xenon', 'Lively Helium', 'Steady Carbon'];
+  for (let i = 0; i < guests; i++) { const g = arena.client('guest' + i); await g.signInGuest(GN[i]); await g.join(code, extra()); out.push(g); await gap(); }
   return out;
 }

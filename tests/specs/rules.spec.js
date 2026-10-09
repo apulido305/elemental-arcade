@@ -384,3 +384,42 @@ test.describe('rules: joining and seats', () => {
     await expectDenied(kid.F.updateDoc(kid.ref('matches', code), { aggUntil: kid.F.Timestamp.fromMillis(arena.backend.now() + 3 * 60e3) }), 'within 2 min');
   });
 });
+
+test.describe('rules: profile icons', () => {
+  test('/players: icon must be a preset id; a guest still cannot write /players at all', async ({ arena }) => {
+    const kid = await signedKid(arena, 'kid');
+    const F = kid.F, me = kid.ref('players', kid.uid);
+    await F.updateDoc(me, { icon: 'flask' });
+    expect(arena.backend.adminGet('players/' + kid.uid).icon).toBe('flask');
+    await expectDenied(F.updateDoc(me, { icon: 'unicorn' }), 'preset id');
+    await expectDenied(F.updateDoc(me, { icon: '<svg onload=alert(1)>' }), 'preset id');
+    await expectDenied(F.updateDoc(me, { icon: 7 }), 'preset id');
+    await expectDenied(F.updateDoc(me, { 'progress.icon': 'flask' }), 'whitelisted');   // only top-level
+    const g = await guest(arena);
+    await expectDenied(g.F.setDoc(g.ref('players', g.uid), { progress: {}, nick: 'x', cls: 'y', icon: 'atom', updated: g.F.serverTimestamp() }), 'not anonymous');
+    await expectDenied(g.F.updateDoc(g.ref('players', kid.uid), { icon: 'atom' }));
+    expect(arena.backend.adminGet('players/' + kid.uid).icon).toBe('flask');
+  });
+
+  test('seats: icon optional on join, preset ids only; you can change your own, nobody else can (not even the aggregator)', async ({ arena }) => {
+    const { host, code } = await openLobby(arena);
+    const kid = await signedKid(arena, 'kid');
+    await expectDenied(kid.join(code, { check: false, playerExtra: { icon: 'dragon' } }), 'preset id');
+    await kid.join(code, { playerExtra: { icon: 'bolt' } });                          // with an icon
+    const plain = await signedKid(arena, 'plain'); await plain.join(code);           // without one (older client)
+    const g = await guest(arena);
+    await expectDenied(g.join(code, { check: false, playerExtra: { icon: 'nope' } }), 'preset id');
+    await g.join(code, { playerExtra: { icon: 'rocket' } });                          // guests may set icon on their own seat
+    const seat = c => arena.backend.adminGet(`matches/${code}/players/${c.uid}`);
+    expect([seat(kid).icon, seat(plain).icon, seat(g).icon]).toEqual(['bolt', undefined, 'rocket']);
+    const upd = (c, who, d) => c.F.updateDoc(c.ref('matches', code, 'players', who.uid), d);
+    await upd(kid, kid, { icon: 'moon' });
+    await upd(g, g, { icon: 'star' });
+    await expectDenied(upd(kid, kid, { icon: 'dragon' }), 'preset id');
+    await expectDenied(upd(kid, g, { icon: 'atom' }));                              // someone else's seat
+    await expectDenied(upd(g, kid, { icon: 'atom' }));
+    await host.start(code);
+    await expectDenied(upd(host, kid, { icon: 'atom' }), 'only abandoned changes');   // aggregator path is abandoned-only
+    expect([seat(kid).icon, seat(g).icon]).toEqual(['moon', 'star']);
+  });
+});
