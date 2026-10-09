@@ -711,9 +711,16 @@ const GEN={
       return{prompt:'Which period (row) is '+esc(it.name)+' in?',clue:tileScaled(it,{neutral:true,hide:{shells:true}}),opts:numOpts(+it.s2v,1,7),
         exp:'<p><b>'+esc(it.name)+'</b> is in period <b>'+esc(it.s2v)+'</b>.</p>'};
     }
-    return{prompt:'What state is '+esc(it.name)+' at room temperature?',clue:tileScaled(it,{neutral:true}),
-      opts:['Solid','Liquid','Gas'].map(h=>({h,ok:h===it.s3v})),
-      exp:'<p><b>'+esc(it.name)+'</b> is a <b>'+esc(it.s3v.toLowerCase())+'</b> at room temperature.</p>'};
+    // 4 options: the answer is the card itself; the 3 decoys are elements in a different known state (deck first, then all elements).
+    const known=['Solid','Liquid','Gas'],other=x=>x.cat==='el'&&x.id!==it.id&&known.includes(x.s3v)&&x.s3v!==it.s3v;
+    const pref=it.s3v==='Liquid'?['Ga','Cs','Sn','I']:[];   // near-liquid metals and iodine make good liquid decoys
+    const ord=a=>{const s=shuffle(a);return s.filter(x=>pref.includes(x.sym)).concat(s.filter(x=>!pref.includes(x.sym)))};
+    const inDeck=ord(dpool(it).filter(other));
+    const dist=inDeck.concat(ord(ALL.filter(x=>other(x)&&!inDeck.includes(x)))).map(x=>esc(x.name));
+    const opts=mkOpts(esc(it.name),dist);if(!opts)return null;
+    const sw=it.s3v.toLowerCase();
+    return{prompt:'Which of these is a '+sw+' at room temperature?',clue:'',opts,
+      exp:'<p><b>'+esc(it.name)+'</b> is a <b>'+sw+'</b> at room temperature.</p>'};
   },
   type(it){
     if(it.cat==='el'){
