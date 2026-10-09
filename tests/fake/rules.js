@@ -16,7 +16,7 @@
 
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const DECK_IDS = ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all'];
-export const ROOM_IDS = ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'mixed'];
+export const ROOM_IDS = ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'mixed'];
 export const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
 // Profile icon ids (index.html ICONS). Optional on /players and on seats; anything else is rejected.
 export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
