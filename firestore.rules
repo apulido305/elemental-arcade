@@ -91,7 +91,8 @@ service cloud.firestore {
         && request.resource.data.status == 'lobby'
         && request.resource.data.createdAt == request.time
         && request.resource.data.expireAt is timestamp
-        && request.resource.data.expireAt <= request.time + duration.value(6, 'm')
+        // Host alone: a 60-minute cleanup hold (no countdown). The 10-minute start timer is set when a second player joins.
+        && request.resource.data.expireAt <= request.time + duration.value(61, 'm')
         && request.resource.data.playerCount == 1
         && request.resource.data.startAt == null
         && request.resource.data.alive == 1
@@ -175,12 +176,20 @@ service cloud.firestore {
                     && request.resource.data.aggUntil <= request.time + duration.value(2, 'm'))))
 
         // 6. Seat count: +1 when your own new seat is created, -1 when your own seat is deleted, lobby only,
-        //    never above cap. The seat write happens in the same transaction.
+        //    never above cap. The seat write happens in the same transaction. The same write may move expireAt:
+        //    to about now + 10 min when the count becomes 2 (the start timer begins), or back to the solo hold
+        //    (<= now + 60 min) when it drops to 1. 1 minute of slack each way for phone clocks.
         || (signedIn()
             && resource.data.status == 'lobby'
             && request.resource.data.status == 'lobby'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount', 'expireAt'])
             && request.resource.data.playerCount is int
+            && (!('expireAt' in request.resource.data.diff(resource.data).affectedKeys())
+                || (request.resource.data.playerCount == 2
+                    && request.resource.data.expireAt >= request.time + duration.value(9, 'm')
+                    && request.resource.data.expireAt <= request.time + duration.value(11, 'm'))
+                || (request.resource.data.playerCount == 1
+                    && request.resource.data.expireAt <= request.time + duration.value(61, 'm')))
             && ((request.resource.data.playerCount == resource.data.playerCount + 1
                  && request.resource.data.playerCount <= resource.data.cap
                  && !exists(seatPath(code, request.auth.uid))

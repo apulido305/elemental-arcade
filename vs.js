@@ -16,7 +16,10 @@ const Q_BASE = 15000, REVEAL_BASE = 2500, LEAD_BASE = 5000, SPLASH_BASE = 2000;
 // STALE_BASE: silence before the aggregator may mark a player abandoned. Generous on purpose: a slow phone's
 // heartbeats arrive late, and abandoned is permanent (every later answer is refused).
 const QN_DEF = 10, QN_OK = [10, 15, 20], LATE_BASE = 8000;
-const BEAT_BASE = 15000, STALE_BASE = 45000, AGG_BASE = 30000, LOBBY_BASE = 5 * 60 * 1000;
+// Lobby timer: while the host waits alone there is no countdown, only a quiet SOLO_BASE cleanup so an abandoned
+// lobby leaves the class lobby list. When a second player joins, expireAt is reset to now + LOBBY_BASE and the
+// countdown shows. If the lobby drops back to one player, it returns to the solo hold. Rules mirror both limits.
+const BEAT_BASE = 15000, STALE_BASE = 45000, AGG_BASE = 30000, LOBBY_BASE = 10 * 60 * 1000, SOLO_BASE = 60 * 60 * 1000;
 const REACT_GAP_BASE = 3000, REACT_SHOW_BASE = 4000;
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
@@ -495,7 +498,9 @@ async function joinTx(code, nick, guest) {
       if ((m.playerCount || 0) >= (m.cap || 20)) throw vsErr('full');
       if (guest && !m.allowGuests) throw vsErr('noguests');
       tx.set(pref, seat(nick, guest));
-      tx.update(mref, { playerCount: (m.playerCount || 0) + 1 });
+      const n = (m.playerCount || 0) + 1;
+      // The second player starts the 10-minute start timer (later joiners leave it alone).
+      tx.update(mref, n === 2 ? { playerCount: n, expireAt: F.Timestamp.fromMillis(Date.now() + LOBBY_BASE * TS()) } : { playerCount: n });
     });
     return;
   } catch (e) {
@@ -533,7 +538,7 @@ async function createMatch(o) {
     b.set(mref, Object.assign({
       hostUid: uid, hostNick: acct.nick, cls: acct.cls, deck: o.deck, room: o.room, seed: (Math.random() * 0x100000000) >>> 0,
       cap: o.cap, allowGuests: o.allowGuests, listed: o.listed, status: 'lobby', createdAt: F.serverTimestamp(),
-      expireAt: F.Timestamp.fromMillis(now + LOBBY_BASE * TS()), playerCount: 1, startAt: null, alive: 1, aggUid: uid,
+      expireAt: F.Timestamp.fromMillis(now + SOLO_BASE * TS()), playerCount: 1, startAt: null, alive: 1, aggUid: uid,
       aggUntil: F.Timestamp.fromMillis(now + AGG_BASE * TS()), winnerUid: null, endedAt: null, rematch: null
     }, o.qn && o.qn !== QN_DEF ? { qn: o.qn } : {}));   // qn only when not the default, so 10-question hosting works on rules that predate it
     b.set(F.doc(db, 'matches', code, 'players', uid), seat(acct.nick, false));
@@ -670,7 +675,8 @@ function lobbyTick() {
   const m = R.match; if (!m) return;
   const left = toMs(m.expireAt) - Date.now();
   const el = q$('#vs-expiry');
-  if (el && toMs(m.expireAt)) { const s = Math.max(0, Math.ceil(left / 1000 / TS())); const t = 'This lobby closes in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' if it does not start.'; if (el.textContent !== t) el.textContent = t; }
+  // Countdown only once a second player is in; before that the expiry is the silent solo hold.
+  if (el && toMs(m.expireAt)) { const s = Math.max(0, Math.ceil(left / 1000 / TS())); const t = (m.playerCount || 0) < 2 ? 'The 10-minute start timer begins when a second player joins.' : 'This lobby closes in ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' if it does not start.'; if (el.textContent !== t) el.textContent = t; }
   if (toMs(m.expireAt) && left < 0) {
     fb.F.updateDoc(R.mref, { status: 'expired' }).catch(() => {});
     R.view = 'gone'; R.goneMsg = MSG.expired; stopTimers(); detachPlayers(); render();
@@ -719,7 +725,9 @@ async function leaveRoom() {
           const ms = await tx.get(r.mref); if (!ms.exists()) return;
           const m = ms.data(); const mine = await tx.get(r.pref);
           if (m.status !== 'lobby' || !mine.exists()) return;
-          tx.delete(r.pref); tx.update(r.mref, { playerCount: Math.max(0, (m.playerCount || 1) - 1) });
+          const n = Math.max(0, (m.playerCount || 1) - 1);
+          // Back to one player: stop the countdown (solo hold again); the next joiner starts a fresh 10 minutes.
+          tx.delete(r.pref); tx.update(r.mref, n === 1 ? { playerCount: n, expireAt: F.Timestamp.fromMillis(Date.now() + SOLO_BASE * TS()) } : { playerCount: n });
         }).catch(() => F.updateDoc(r.pref, { left: true }).catch(() => {}));
       }
     } else if (view === 'play') {

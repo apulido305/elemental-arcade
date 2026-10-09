@@ -274,7 +274,7 @@ test.describe('rules: match document', () => {
     await expectDenied(host.F.updateDoc(host.ref('matches', code), { hostUid: kid.uid }));
   });
 
-  test('create requires exact keys, own class/nick, status lobby, expireAt <= now+6 min', async ({ arena }) => {
+  test('create requires exact keys, own class/nick, status lobby, expireAt <= now+61 min', async ({ arena }) => {
     const h = arena.client('h'); await h.signUp('class1', 'host');
     const F = h.F, md = o => h.matchDoc(o);
     const put = (code, d) => { const b = F.writeBatch(h.db); b.set(h.ref('matches', code), d); b.set(h.ref('matches', code, 'players', h.uid), h.playerDoc()); return b.commit(); };
@@ -286,9 +286,9 @@ test.describe('rules: match document', () => {
     await expectDenied(put('AAAAAA', md({ createdAt: F.Timestamp.fromMillis(1) })), 'createdAt');
     await expectDenied(put('AAAAAA', md({ hostUid: 'someone-else' })), 'hostUid');
     await expectDenied(put('AAAAAA', md({ deck: 'nope' })), 'known ids');
-    await expectDenied(put('AAAAAA', md({ expireAt: F.Timestamp.fromMillis(arena.backend.now() + 7 * 60e3) })), 'now + 6 min');
+    await expectDenied(put('AAAAAA', md({ expireAt: F.Timestamp.fromMillis(arena.backend.now() + 62 * 60e3) })), 'now + 61 min');
     await expectDenied(put('AAAIAA', md()), '6 chars');                                    // I is not in the code alphabet
-    await put('CCCCCC', md({ expireAt: F.Timestamp.fromMillis(arena.backend.now() + 5.9 * 60e3) }));
+    await put('CCCCCC', md({ expireAt: F.Timestamp.fromMillis(arena.backend.now() + 60 * 60e3) }));   // the solo hold
     expect((await h.getMatch('CCCCCC')).playerCount).toBe(1);
   });
 });
@@ -504,5 +504,32 @@ test.describe('rules: round length (qn) and late answers', () => {
     toQuestion(arena, c2, 3, 1); arena.backend.advanceClock(1000 * ts);
     await h2.finish(c2, h2.uid);
     await expectDenied(k2.answer(c2, 3), "'done' for the last question");
+  });
+});
+
+test.describe('rules: lobby start timer', () => {
+  test('the second joiner may set expireAt to now + 10 min; later joiners may not; dropping to 1 may return it to the solo hold', async ({ arena }) => {
+    const { host, code } = await openLobby(arena);
+    const [a, b, c] = [await signedKid(arena, 'a'), await signedKid(arena, 'b'), await signedKid(arena, 'c')];
+    const F = a.F, mref = cl => cl.ref('matches', code), at = min => F.Timestamp.fromMillis(arena.backend.now() + min * 60e3);
+    const join = (cl, patch) => cl.F.runTransaction(cl.db, async tx => {
+      const m = (await tx.get(mref(cl))).data();
+      tx.set(cl.ref('matches', code, 'players', cl.uid), cl.playerDoc());
+      tx.update(mref(cl), Object.assign({ playerCount: m.playerCount + 1 }, patch));
+    });
+    const leave = (cl, patch) => cl.F.runTransaction(cl.db, async tx => {
+      const m = (await tx.get(mref(cl))).data();
+      tx.delete(cl.ref('matches', code, 'players', cl.uid));
+      tx.update(mref(cl), Object.assign({ playerCount: m.playerCount - 1 }, patch));
+    });
+    await expectDenied(join(a, { expireAt: at(30) }), 'now + 9..11 min');           // the 2nd joiner cannot buy 30 minutes
+    await join(a, { expireAt: at(10) });                                              // the start timer begins
+    await expectDenied(join(b, { expireAt: at(10) }), 'now + 9..11 min');           // a 3rd joiner cannot restart it
+    await join(b);
+    await expectDenied(leave(b, { expireAt: at(60) }), 'now + 9..11 min');          // 3 -> 2 keeps the running timer
+    await leave(b);
+    await leave(a, { expireAt: at(60) });                                             // back to the host alone: solo hold
+    expect((await host.getMatch(code)).playerCount).toBe(1);
+    await expectDenied(c.F.updateDoc(c.ref('matches', code), { expireAt: at(60) }));   // never without a seat change
   });
 });

@@ -20,7 +20,7 @@ export const ROOM_IDS = ['ability', 'symbol', 'number', 'shells', 'config', 'tab
 export const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
 // Profile icon ids (index.html ICONS). Optional on /players and on seats; anything else is rejected.
 export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
-const MAX_CAP = 20, MIN_CAP = 2;
+const MAX_CAP = 20, MIN_CAP = 2, MIN = 60 * 1000;
 
 export const MATCH_KEYS = ['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests', 'listed', 'status',
   'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil', 'winnerUid', 'endedAt', 'rematch'];
@@ -85,7 +85,7 @@ const matchCreate = [
   ['allowGuests and listed are booleans', c => isBool(c.inc.allowGuests) && isBool(c.inc.listed)],
   ["status == 'lobby'", c => c.inc.status === 'lobby'],
   ['createdAt == request.time (serverTimestamp)', c => ms(c.inc.createdAt) === c.time],
-  ['expireAt is a timestamp <= now + 6 min', c => isTs(c.inc.expireAt) && ms(c.inc.expireAt) <= c.time + 6 * 60 * 1000 * c.ts],
+  ['expireAt is a timestamp <= now + 61 min (solo hold)', c => isTs(c.inc.expireAt) && ms(c.inc.expireAt) <= c.time + 61 * MIN * c.ts],
   ['playerCount == 1, alive == 1', c => c.inc.playerCount === 1 && c.inc.alive === 1],
   ['startAt == null', c => c.inc.startAt === null],
   ['aggUid == uid, aggUntil is a timestamp', c => c.inc.aggUid === c.uid && isTs(c.inc.aggUntil)],
@@ -138,7 +138,10 @@ const matchUpdate = [
   alt('6. seat count +1 / -1 together with own seat create / delete (lobby only)',
     signedIn,
     ['lobby before and after', c => c.res.status === 'lobby' && c.inc.status === 'lobby'],
-    ['only playerCount changes, as an int', c => subset(c.changed, ['playerCount']) && isInt(c.inc.playerCount)],
+    ['only playerCount (and expireAt) change, count as an int', c => subset(c.changed, ['playerCount', 'expireAt']) && isInt(c.inc.playerCount)],
+    ['expireAt: now + 9..11 min when the count becomes 2, <= now + 61 min when it drops to 1', c => !has(c, 'expireAt') || (isTs(c.inc.expireAt) && (
+      (c.inc.playerCount === 2 && ms(c.inc.expireAt) >= c.time + 9 * MIN * c.ts && ms(c.inc.expireAt) <= c.time + 11 * MIN * c.ts) ||
+      (c.inc.playerCount === 1 && ms(c.inc.expireAt) <= c.time + 61 * MIN * c.ts)))],
     ['+1 <= cap with own new seat, or -1 with own seat deleted', c => {
       const me = seatPath(c, c.uid);
       return (c.inc.playerCount === c.res.playerCount + 1 && c.inc.playerCount <= c.res.cap && !c.exists(me) && c.existsAfter(me)) ||
