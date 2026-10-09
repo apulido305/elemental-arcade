@@ -1,8 +1,8 @@
 // Unit tests for the seeded question builder, run inside the real index.html with Firebase blocked.
 import { test, expect } from '../helpers/fixtures.js';
 
-const DECKS = ['s20', 'r4', 'e118', 'cat', 'iso', 'all'];
-const ROOMS = ['mixed', 'ability', 'symbol', 'number', 'shells', 'config', 'lab'];
+const DECKS = ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'iso', 'all'];
+const ROOMS = ['mixed', 'ability', 'symbol', 'number', 'shells', 'config', 'lab', 'ion', 'metal'];
 const SEEDS = [1, 42, 123456789, 0xdeadbeef, 4294967295];
 
 test.describe('buildRound / makeQ', () => {

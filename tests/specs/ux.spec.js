@@ -54,7 +54,7 @@ test('locked rooms: last, flat, aria-disabled; a tap says why and starts nothing
   const dev = await arena.device({ width: PHONE, fonts: true }), p = dev.page;
   await dev.goto('/');
   const rooms = p.locator('[data-act="room"]');
-  await expect(rooms.last()).toHaveAttribute('data-id', 'lab');                  // Starter 20 has no ions or isotopes
+  await expect(rooms.last()).toHaveAttribute('data-id', 'review');               // locked rooms keep ROOMS order: Starter 20 has no ions or isotopes (Particle Lab) and no misses yet (Review Room)
   const lab = p.locator('[data-act="room"][data-id="lab"]');
   await expect(lab).toHaveAttribute('aria-disabled', 'true');
   expect(await lab.getAttribute('disabled')).toBeNull();                         // still tappable, so it can answer
@@ -67,10 +67,10 @@ test('locked rooms: last, flat, aria-disabled; a tap says why and starts nothing
   await shot(p, 'locked-room', PHONE);
   const mixedBand = await p.locator('[data-act="room"][data-id="mixed"] .band').evaluate(e => getComputedStyle(e).backgroundImage);
   expect(mixedBand).toContain('243, 221, 122');                                  // gold
-  // Cations: Number Crunch and Table Map lock, Particle Lab opens
+  // Cations: the rooms that need element cards lock (Number Crunch, Table Map, Ion Maker, Metal Detector) and so does the Review Room (no misses yet); Particle Lab opens
   await p.locator('[data-act="deck"][data-id="cat"]').click();
   await expect(p.locator('[data-ui="room-status"]')).toHaveText('');            // deck change clears the message
-  await expect(p.locator('[data-act="room"][aria-disabled="true"]')).toHaveCount(2);
+  await expect(p.locator('[data-act="room"][aria-disabled="true"]')).toHaveCount(5);
   await p.locator('[data-act="room"][data-id="number"]').click({ force: true });
   await expect(p.locator('[data-ui="room-status"]')).toHaveText('Number Crunch needs element cards. Try Starter 20 or All 118.');
   await expect(p.locator('[data-act="room"][data-id="lab"]')).not.toHaveAttribute('aria-disabled', 'true');
