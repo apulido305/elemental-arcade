@@ -423,3 +423,35 @@ test.describe('rules: profile icons', () => {
     expect([seat(kid).icon, seat(g).icon]).toEqual(['moon', 'star']);
   });
 });
+
+test.describe('rules: rooms (ion, metal; review is solo only)', () => {
+  test('matches with room ion or metal are accepted; room review is rejected at create and on a host edit', async ({ arena }) => {
+    const host = arena.client('host'); await host.signUp('class1', 'host');
+    const ion = await host.createMatch({ room: 'ion' });
+    expect((await host.getMatch(ion)).room).toBe('ion');
+    const metal = await host.createMatch({ room: 'metal' });
+    expect((await host.getMatch(metal)).room).toBe('metal');
+    await expectDenied(host.createMatch({ room: 'review' }), 'known ids');
+    await host.F.updateDoc(host.ref('matches', ion), { room: 'metal' });
+    expect((await host.getMatch(ion)).room).toBe('metal');
+    await expectDenied(host.F.updateDoc(host.ref('matches', ion), { room: 'review' }), 'deck and room known');
+    expect((await host.getMatch(ion)).room).toBe('metal');
+  });
+
+  test('a seat with room review in the same batch is rejected; the same seat without it is accepted', async ({ arena }) => {
+    const host = arena.client('host'); await host.signUp('class1', 'host');
+    const code = await host.createMatch({ room: 'ion' });
+    const seat = async (kid, room) => {
+      const b = kid.F.writeBatch(kid.db);
+      b.set(kid.ref('matches', code, 'players', kid.uid), kid.playerDoc());
+      b.update(kid.ref('matches', code), { playerCount: kid.F.increment(1), ...(room ? { room } : {}) });
+      return b.commit();
+    };
+    const bad = await signedKid(arena, 'kid');
+    await expectDenied(seat(bad, 'review'));
+    expect((await host.getMatch(code)).playerCount).toBe(1);
+    const good = await signedKid(arena, 'kid2');
+    await seat(good);
+    expect(await host.getMatch(code)).toMatchObject({ playerCount: 2, room: 'ion' });
+  });
+});
