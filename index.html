@@ -512,7 +512,15 @@ const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 const themeOf=it=>THEMES[it.family]||THEMES.Blank;
 const symHTML=it=>(it.pre?'<sup>'+esc(it.pre)+'</sup>':'')+esc(it.sym)+(it.post?'<sup>'+esc(it.post)+'</sup>':'');
 const base=it=>it.name.replace(/ Ion$/,'').replace(/-\d+$/,'');
-const mask=(it,s)=>String(s).replace(new RegExp('\\b'+base(it).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\w*','gi'),'_____');
+const reEsc=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const supOf=p=>String(p).replace(/[0-9+−-]/g,c=>({'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','−':'⁻','-':'⁻'})[c]);
+// Hides the name (and its 5-letter stem: "Fluor..", "Nicke..", "Chrom..") and, for ions, the exact symbol+charge ("Fe²⁺", "Na⁺").
+const mask=(it,s)=>{
+  let t=String(s);
+  if(it.post)t=t.replace(new RegExp(reEsc(it.sym+supOf(it.post))+'|'+reEsc(it.sym+it.post),'g'),'_____');
+  const b=base(it),stem=(b.match(/[A-Za-z]+/)||[b])[0].slice(0,5);
+  return t.replace(new RegExp('\\b(?:'+reEsc(b)+'|'+reEsc(stem)+')\\w*','gi'),'_____');
+};
 const kindWord=it=>({el:'element',cat:'ion',an:'ion',poly:'polyatomic ion',iso:'isotope'})[it.cat];
 const charge=p=>{const m=String(p||'').match(/(\d+)?\s*([+−-])/);return m?{n:m[1]?+m[1]:1,pos:m[2]==='+'}:null};
 function levelInfo(xp){let L=1,x=xp;while(x>=100*L){x-=100*L;L++}const T=['Proton Pupil','Neutron Scout','Electron Explorer','Bond Builder','Lab Captain','Reaction Ranger','Orbital Ace','Periodic Pro','Element Master'];return{lvl:L,into:x,need:100*L,title:T[Math.min(L-1,T.length-1)]}}
