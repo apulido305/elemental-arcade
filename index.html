@@ -685,7 +685,7 @@ function vsHTML(){
     return '<section class="vsrow"><button class="vsbtn" data-act="vs" data-vs="vs-open">VS Arena<small>Live, up to 20 players</small></button>'+
     (ACCT&&S.vs&&S.vs.played>0?'<span class="vsrec" data-vs="vs-record">'+esc(vsRec())+'</span>':'')+'</section>';
   }
-  if(window.Cloud||CLOUDLATE)return '<p class="vsoff" data-vs="vs-off">VS Arena needs sign-in, which is not set up on this copy.</p>';
+  if(window.Cloud||CLOUDLATE)return '<p class="vsoff" data-vs="vs-off">VS Arena could not load. Refresh the page to try again.</p>';
   return '';
 }
 function homeHTML(){
@@ -922,7 +922,8 @@ window.Arcade={S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save
 render();
 </script>
 
-<script type="module" src="cloud.js"></script>
-<script type="module" src="vs.js"></script>
+<!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
+<script type="module" src="cloud.js?v=2"></script>
+<script type="module" src="vs.js?v=2"></script>
 </body>
 </html>
