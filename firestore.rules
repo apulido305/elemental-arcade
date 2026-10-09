@@ -12,10 +12,17 @@ service cloud.firestore {
     function isAccount() { return signedIn() && !isAnon(); }
 
     function playerDoc(uid) { return /databases/$(database)/documents/players/$(uid); }
+
+    // Cleanup (vs.js sweep): a match is dead once it has ended (expired, done or abandoned) and was created more
+    // than a day ago. Any signed-in account may delete a dead match and everything under it; children of a match
+    // that no longer exists (left over from an earlier partial delete) may be deleted too.
+    function deadMatch(m) { return m.status in ['expired', 'done', 'abandoned'] && request.time > m.createdAt + duration.value(1, 'd'); }
     function matchPath(code) { return /databases/$(database)/documents/matches/$(code); }
     function seatPath(code, uid) { return /databases/$(database)/documents/matches/$(code)/players/$(uid); }
 
     function isParticipant(code) { return signedIn() && exists(seatPath(code, request.auth.uid)); }
+
+    function deadOrGone(code) { return !exists(matchPath(code)) || deadMatch(get(matchPath(code)).data); }
 
     function answerPath(code, uid, q) { return /databases/$(database)/documents/matches/$(code)/answers/$(uid + '_' + string(q)); }
 
@@ -62,9 +69,9 @@ service cloud.firestore {
 
       // Listing is the class lobby. Accounts only, never guests, and only open listed lobbies of the
       // caller's own class. A guest cannot enumerate matches.
+      // The cleanup sweep lists every match of the caller's own class (any status); the class lobby query
+      // (listed, lobby, own class) is a narrower case of the same rule. Guests still list nothing.
       allow list: if isAccount()
-        && resource.data.listed == true
-        && resource.data.status == 'lobby'
         && resource.data.cls == get(playerDoc(request.auth.uid)).data.cls;
 
       // Create: the host only, a real account (never a guest), with exactly this field set and
@@ -197,9 +204,19 @@ service cloud.firestore {
                 || (request.resource.data.playerCount == resource.data.playerCount - 1
                     && request.resource.data.playerCount >= 0
                     && exists(seatPath(code, request.auth.uid))
-                    && !existsAfter(seatPath(code, request.auth.uid)))));
+                    && !existsAfter(seatPath(code, request.auth.uid)))))
 
-      allow delete: if false;
+        // 7. Cleanup: any account may end a match stuck in 'playing' an hour after it started (everyone left;
+        //    the longest match is about 6 minutes). Only status -> abandoned and endedAt (server time) change.
+        || (isAccount()
+            && resource.data.status == 'playing'
+            && request.time > resource.data.startAt + duration.value(1, 'h')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'endedAt'])
+            && request.resource.data.status == 'abandoned'
+            && request.resource.data.endedAt == request.time);
+
+      // Cleanup: a dead match (ended, created over a day ago) may be deleted by any account.
+      allow delete: if isAccount() && deadMatch(resource.data);
 
       // -------------------------------------------------------------------------------------------
       // matches/{code}/players/{uid}: a seat. Holds the public scoreboard row for one player.
@@ -208,6 +225,8 @@ service cloud.firestore {
         // Only people seated in this match can read the board. A seat holder may also read their own
         // (missing) seat, which is how a join transaction checks "already here".
         allow read: if signedIn() && (request.auth.uid == uid || isParticipant(code));
+        // Cleanup: the sweep lists a dead match's seats to find what to delete.
+        allow list: if isAccount() && deadOrGone(code);
 
         // Join (or host's first seat). Only for yourself, only with this exact field set and starting values.
         // icon is optional (older clients leave it out) and must be one of the preset ids.
@@ -298,9 +317,11 @@ service cloud.firestore {
 
         // Leaving the lobby deletes your own seat (the seat count drops in the same transaction).
         // Once the match starts, seats stay for the record and you set left = true instead.
-        allow delete: if signedIn()
+        // Cleanup: any account may delete seats of a dead (or already deleted) match.
+        allow delete: if (signedIn()
           && request.auth.uid == uid
-          && get(matchPath(code)).data.status == 'lobby';
+          && get(matchPath(code)).data.status == 'lobby')
+          || (isAccount() && deadOrGone(code));
       }
 
       // -------------------------------------------------------------------------------------------
@@ -333,7 +354,8 @@ service cloud.firestore {
           && request.time >= qOpensAt(get(matchPath(code)).data, request.resource.data.q) - duration.value(2000, 'ms')
           && request.time <= qOpensAt(get(matchPath(code)).data, request.resource.data.q) + duration.value(23000, 'ms');
 
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if isAccount() && deadOrGone(code);   // cleanup only
       }
 
       // -------------------------------------------------------------------------------------------
@@ -346,7 +368,7 @@ service cloud.firestore {
           && request.auth.uid == uid
           && isParticipant(code)
           && request.resource.data.keys().hasOnly(['at']);
-        allow delete: if false;
+        allow delete: if isAccount() && deadOrGone(code);   // cleanup only
       }
     }
   }
