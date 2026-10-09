@@ -7,7 +7,12 @@
 <title>Elemental Arcade</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:wght@400;700&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:wght@400;700&family=DM+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:wght@400;700&family=DM+Mono:wght@500&display=swap" rel="stylesheet"></noscript>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" crossorigin>
 <style>
 /* Layout: one navy arcade cabinet. Top bar with trainer level, then deck chips, then a grid of room tiles. Quiz is a single panel, answers in a 2x2 grid, card revealed after answering. */
 :root{
@@ -189,6 +194,8 @@ h1,h2,h3{margin:0;font-weight:400}
 @keyframes sheen{from{background-position:10% 10%;-webkit-mask-position:10% 10%;mask-position:10% 10%}to{background-position:90% 90%;-webkit-mask-position:90% 90%;mask-position:90% 90%}}
 .cw{transition:transform .12s ease-out}
 .cell{display:flex;flex-direction:column;align-items:center;gap:5px}
+.grid .cell{padding:8px;margin:-8px;content-visibility:auto;contain-intrinsic-size:auto 126px auto 195px}
+.grid .slot{content-visibility:auto;contain-intrinsic-size:auto 110px auto 155px}
 .tcap{display:flex;flex-direction:column;align-items:center;gap:1px;font:700 11px/1.1 var(--body);color:var(--mute);letter-spacing:.3px}
 .tcap em{font-style:normal;color:var(--gold);letter-spacing:1px;font-size:10px}
 .tcap u{text-decoration:none;color:#3a4690}
@@ -373,6 +380,7 @@ main.enter>*{animation:fadeIn .3s backwards}
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div id="modal-root"></div>
 <div id="vs" hidden></div>
 
 <script>
@@ -569,6 +577,8 @@ const tierShown=id=>Math.max(0,tierOf(S.owned[id]||0));
 const nextTier=n=>TIERS.find(t=>t.at>n)||null;
 const prevAt=n=>{let p=0;TIERS.forEach(t=>{if(n>=t.at)p=t.at});return p};
 const GOLD='linear-gradient(135deg,#fff3b0,#e0b81a 28%,#9a7400 52%,#f6dc6a 78%,#a67c00)';
+const ARTURI={};
+const atomURI=it=>ARTURI[it.id]||(ARTURI[it.id]=encodeURIComponent(atomArt(it)));
 function atomArt(it){
   let sh=String(it.shells||'').split(',').map(x=>parseInt(x,10)).filter(n=>n>0);
   if(!sh.length)sh=[3,6,8];
@@ -581,13 +591,16 @@ function atomArt(it){
   });
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 324" width="224" height="324">'+g+'</svg>';
 }
+const CIC={};
 function cardInner(it,tier){
-  tier=tier||0;
+  tier=tier||0;const ck=it.id+'|'+tier;return CIC[ck]||(CIC[ck]=cardInner0(it,tier));
+}
+function cardInner0(it,tier){
   const c=themeOf(it);const {nameSize}=sizes(it);const cfgl=it.cfgl||'Electron configuration';
   const full=tier>=2,holo=tier===1||tier>=3,gold=tier===4;
   const P=full?'rgba(255,255,255,.9)':'#fff';
   const frame=gold?GOLD:c.dark;
-  const bg=full?"url('data:image/svg+xml,"+encodeURIComponent(atomArt(it))+"') center/100% 100% no-repeat,radial-gradient(circle at 50% 33%,"+c.light+" 0%,"+c.mid+" 55%,"+c.dark+" 100%)":'linear-gradient(165deg,'+c.tint+','+c.light+')';
+  const bg=full?"url('data:image/svg+xml,"+atomURI(it)+"') center/100% 100% no-repeat,radial-gradient(circle at 50% 33%,"+c.light+" 0%,"+c.mid+" 55%,"+c.dark+" 100%)":'linear-gradient(165deg,'+c.tint+','+c.light+')';
   const lab=(l,v,first)=>'<div style="display:flex;flex-direction:column;align-items:center;padding:3px 0;'+(first?'':'border-left:1px solid '+c.mid)+'"><span style="font-family:\'Atkinson Hyperlegible\',sans-serif;font-weight:700;font-size:7.5px;letter-spacing:1.2px;color:'+c.dark+';text-transform:uppercase;line-height:1.3">'+esc(l)+'</span><span style="font-family:\'Lilita One\',sans-serif;font-size:13px;line-height:1.1;min-height:14px">'+esc(v)+'</span></div>';
   return '<div class="card" style="width:240px;height:336px;box-sizing:border-box;padding:6px;border-radius:16px;background:'+frame+';display:flex">'+
   '<div style="flex:1;min-width:0;box-sizing:border-box;border-radius:11px;background:'+bg+';padding:8px;display:flex;flex-direction:column;gap:5px;font-family:\'Atkinson Hyperlegible\',sans-serif;color:#111;text-align:left">'+
@@ -818,7 +831,8 @@ window.buildRound=buildRound;window.mulberry32=mulberry32;
 const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
-const roomPool=(room,deckId)=>deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t)));
+const RPC={};
+const roomPool=(room,deckId)=>RPC[room.id+'|'+deckId]||(RPC[room.id+'|'+deckId]=deckItems(deckId).filter(it=>room.types.some(t=>supports(it,t))));
 
 function startRound(roomId){
   const room=roomOf(roomId);const pool=roomPool(room,S.deck);
@@ -1007,9 +1021,9 @@ function accountHTML(){
     '<div class="actions" style="margin-top:18px"><button class="btn" data-act="home">Keep playing</button><button class="btn ghost" data-act="signout">Sign out</button></div></section>';
   }
   const f=V.form,up=V.authTab==='up';
-  const bring=up&&guestCount()>0?'<label class="chk"><input type="checkbox" id="f-bring" '+(f.bring?'checked':'')+'> Add the '+guestCount()+' card'+(guestCount()>1?'s':'')+' already on this device to my account</label>':'';
+  const gc=guestCount();const bring=up&&gc>0?'<label class="chk"><input type="checkbox" id="f-bring" '+(f.bring?'checked':'')+'> Add the '+gc+' card'+(gc>1?'s':'')+' already on this device to my account</label>':'';
   return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Save your binder</h1>'+
-  '<p class="sub" data-ui="device-summary">On this device: '+guestCount()+' card'+(guestCount()===1?'':'s')+', Lv '+levelInfo(S.xp).lvl+'.</p>'+acctIconHTML()+
+  '<p class="sub" data-ui="device-summary">On this device: '+gc+' card'+(gc===1?'':'s')+', Lv '+levelInfo(S.xp).lvl+'.</p>'+acctIconHTML()+
   '<p class="sub">Sign in with your class code, a nickname and a PIN. No email needed. Use a nickname, not your real name.</p>'+
   '<div class="tabs" role="tablist" style="margin:14px 0"><button class="tab'+(up?'':' on')+'" data-act="authtab" data-id="in">Sign in</button><button class="tab'+(up?' on':'')+'" data-act="authtab" data-id="up">New account</button></div>'+
   '<form id="authform" autocomplete="off"><div class="fields">'+
@@ -1035,14 +1049,25 @@ function iconsHTML(){
 }
 function render(){
   const body=V.screen==='home'?homeHTML():V.screen==='quiz'?quizHTML():V.screen==='results'?resultsHTML():V.screen==='account'?accountHTML():V.screen==='icons'?iconsHTML():binderHTML();
-  app.innerHTML=topHTML()+'<main'+(V.anim?' class="enter"':'')+'>'+body+'</main>'+(V.modal?modalHTML():'');
+  app.innerHTML=topHTML()+'<main'+(V.anim?' class="enter"':'')+'>'+body+'</main>';
   if(V.screen==='quiz'&&V.pick!=null){
     const nb=app.querySelector('[data-act="next"]');if(nb)nb.focus({preventScroll:true});
     if(V.answered){const h=app.querySelector('.fbh');if(h&&h.scrollIntoView)h.scrollIntoView({block:'nearest',behavior:RM.matches?'auto':'smooth'})}
   }
   V.answered=false;
   if(V.screen==='icons'&&V.iconFocus){const b=app.querySelector('[data-act="icon-pick"][data-id="'+V.iconFocus+'"]');if(b)b.focus({preventScroll:true});V.iconFocus=null}
+  renderModal();
   afterRender();
+}
+let MKEY=null,MOPEN=null,MCW=null,MR=null,MRAF=0;
+function renderModal(force){
+  const it=V.modal&&BY[V.modal],key=it?V.modal:null;
+  if(key===MKEY&&!force)return;
+  const was=MKEY;MKEY=key;MCW=MR=null;
+  if(!key){mroot.innerHTML='';if(was&&MOPEN&&MOPEN.isConnected)MOPEN.focus({preventScroll:true});MOPEN=null;return}
+  if(!was)MOPEN=document.activeElement;
+  mroot.innerHTML=modalHTML();
+  const cb=mroot.querySelector('button');if(cb)cb.focus({preventScroll:true});
 }
 const RM=window.matchMedia?matchMedia('(prefers-reduced-motion: reduce)'):{matches:false};
 function afterRender(){
@@ -1080,12 +1105,12 @@ function doFx(kind){
 }
 
 /* ---------- events ---------- */
-const app=document.getElementById('app');
-app.addEventListener('click',e=>{
+const app=document.getElementById('app'),mroot=document.getElementById('modal-root');
+const onClick=e=>{
   if(e.target.closest('[data-stop]'))return;
   const t=e.target.closest('[data-act]');if(!t)return;
   const a=t.dataset.act,id=t.dataset.id;
-  if(a==='closemodal'){V.modal=null;render();return}
+  if(a==='closemodal'){V.modal=null;renderModal();return}
   if(a==='deck'){S.deck=id;V.deckId=id;V.roomMsg='';save();render()}
   else if(a==='room'){
     if(t.getAttribute('aria-disabled')==='true'){V.roomMsg=lockedMsg(roomOf(id));const st=app.querySelector('[data-ui="room-status"]');if(st)st.textContent=V.roomMsg;return}
@@ -1111,19 +1136,20 @@ app.addEventListener('click',e=>{
   else if(a==='vs'){if(window.VSArena)window.VSArena.open()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
   else if(a==='again')startRound(V.roomId);
-  else if(a==='open'){V.modal=id;render()}
+  else if(a==='open'){V.modal=id;renderModal()}
   else if(a==='flip'){V.flipped[id]=!V.flipped[id];tone('flip');t.classList.toggle('on',!!V.flipped[id])}
   else if(a==='flipall'){V.newIds.forEach(i=>V.flipped[i]=true);tone('flip');app.querySelectorAll('.flip').forEach(b=>b.classList.add('on'))}
-});
+};
+app.addEventListener('click',onClick);mroot.addEventListener('click',onClick);
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'&&V.modal){V.modal=null;render();return}
+  if(e.key==='Escape'&&V.modal){V.modal=null;renderModal();return}
   // Icon picker radiogroup (here and in the VS overlay): arrows move and select, wrapping. Space/Enter are native clicks.
   const rd=e.target&&e.target.closest&&e.target.closest('.icongrid [role="radio"]');
   if(rd&&/^Arrow(Left|Right|Up|Down)$/.test(e.key)){
     const all=[...rd.closest('.icongrid').querySelectorAll('[role="radio"]')],k=all.indexOf(rd),d=/Left|Up/.test(e.key)?-1:1;
     e.preventDefault();all[(k+d+all.length)%all.length].click();return;
   }
-  if(V.screen==='quiz'&&V.pick==null&&/^[1-4]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey){const i=+e.key-1;if(cur()&&cur().opts[i])answer(i)}
+  if(V.screen==='quiz'&&V.pick==null&&!V.modal&&/^[1-4]$/.test(e.key)&&!e.ctrlKey&&!e.metaKey){const i=+e.key-1;if(cur()&&cur().opts[i])answer(i)}
 });
 /* ---------- accounts (only when cloud.js is present and configured) ---------- */
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -1184,15 +1210,29 @@ function wireCloud(){
   });
 }
 if(window.Cloud)wireCloud();else addEventListener('cloud-ready',()=>{wireCloud();render()},{once:true});
+const mclr=()=>{MR=null};
 document.addEventListener('pointermove',e=>{
-  const cw=document.querySelector('.modal .cw');if(!cw)return;
-  const r=cw.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;
-  if(x<0||x>1||y<0||y>1){cw.style.transform='';return}
-  cw.classList.remove('anim');cw.style.setProperty('--hx',(x*100).toFixed(1)+'%');cw.style.setProperty('--hy',(y*100).toFixed(1)+'%');
-  cw.style.transform='perspective(800px) rotateY('+((x-.5)*16).toFixed(1)+'deg) rotateX('+((.5-y)*16).toFixed(1)+'deg)';
-});
-let rz=null;
-addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(V.screen!=='home')render()},180)});
+  if(!V.modal)return;
+  if(!MCW||!MCW.isConnected){MCW=mroot.querySelector('.cw');MR=null}
+  const cw=MCW;if(!cw)return;
+  const cx=e.clientX,cy=e.clientY;
+  if(MRAF)cancelAnimationFrame(MRAF);
+  MRAF=requestAnimationFrame(()=>{
+    MRAF=0;if(!V.modal||!cw.isConnected)return;
+    if(!MR)MR=cw.getBoundingClientRect();
+    const r=MR,x=(cx-r.left)/r.width,y=(cy-r.top)/r.height;
+    if(x<0||x>1||y<0||y>1){cw.style.transform='';return}
+    cw.classList.remove('anim');cw.style.setProperty('--hx',(x*100).toFixed(1)+'%');cw.style.setProperty('--hy',(y*100).toFixed(1)+'%');
+    cw.style.transform='perspective(800px) rotateY('+((x-.5)*16).toFixed(1)+'deg) rotateX('+((.5-y)*16).toFixed(1)+'deg)';
+  });
+},{passive:true});
+mroot.addEventListener('scroll',mclr,{passive:true});mroot.addEventListener('animationend',mclr);addEventListener('scroll',mclr,{passive:true});
+let rz=null,RW=innerWidth;
+addEventListener('resize',()=>{mclr();clearTimeout(rz);rz=setTimeout(()=>{
+  const ae=document.activeElement,typing=ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName),w=innerWidth;
+  if(w===RW||typing)return;
+  RW=w;if(V.screen!=='home')render();if(V.modal)renderModal(true);
+},180)});
 /* Hooks for vs.js (VS Arena). Solo play does not depend on any of this. */
 window.Arcade={S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
@@ -1203,7 +1243,7 @@ render();
 </script>
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
-<script type="module" src="cloud.js?v=3"></script>
-<script type="module" src="vs.js?v=3"></script>
+<script type="module" src="cloud.js?v=4"></script>
+<script type="module" src="vs.js?v=4"></script>
 </body>
 </html>
