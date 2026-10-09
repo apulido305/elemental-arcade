@@ -208,7 +208,7 @@ h1,h2,h3{margin:0;font-weight:400}
 @keyframes pulse{50%{transform:scale(1.2)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 main.enter>*{animation:fadeIn .3s backwards}
-.enter .rooms.stag .room{animation:fadeIn .3s backwards;animation-delay:calc(var(--i,0)*25ms)}
+.enter .rooms.stag .room{animation:fadeIn .3s backwards;animation-delay:calc(min(var(--i,0),8)*25ms)}
 .enter .cell,.enter .slot{animation:fadeIn .35s backwards;animation-delay:calc(var(--i,0)*14ms)}
 .enter .flip{animation:deal .55s cubic-bezier(.2,.9,.3,1.15) backwards;animation-delay:calc(var(--i,0)*.12s + .35s)}
 .enter .stat{animation:rise .4s backwards}
