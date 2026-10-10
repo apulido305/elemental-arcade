@@ -523,7 +523,7 @@ a.btn{text-decoration:none}
 <div id="vs" hidden></div>
 
 <!-- The shared Binder (binder.js, the same file in every arcade game) is a classic script so the game below can use it synchronously. -->
-<script src="binder.js?v=6"></script>
+<script src="binder.js?v=7"></script>
 <script>
 /* ---------- card data (tools/export-cards.mjs exports from here to "profile icons" as cards.json) ---------- */
 const GAME='chem';
@@ -1505,7 +1505,7 @@ function accountHTML(){
   return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Save your binder</h1>'+
   '<p class="sub" data-ui="device-summary">On this device: '+gc+' card'+(gc===1?'':'s')+', Lv '+levelInfo(S.xp).lvl+'.</p>'+acctIconHTML()+
   '<p class="sub">'+(up?'Make an account with your class code, a nickname and a PIN.':'Sign in with your nickname and PIN.')+' No email needed. Use a nickname, not your real name.</p>'+
-  '<p class="sub" data-ui="every-game">One account works in every arcade game: '+Object.values(Binder.GAMES).map(g=>esc(g.title)).join(' and ')+'.</p>'+
+  '<p class="sub" data-ui="every-game">One account works in every arcade game: '+Object.values(Binder.GAMES).map(g=>esc(g.title)).join(', ').replace(/, (?=[^,]*$)/,' and ')+'.</p>'+
   '<div class="tabs" role="tablist" style="margin:14px 0"><button class="tab'+(up?'':' on')+'" data-act="authtab" data-id="in">Sign in</button><button class="tab'+(up?' on':'')+'" data-act="authtab" data-id="up">New account</button></div>'+
   '<form id="authform" autocomplete="off"><div class="fields">'+
   (askCls?'<div class="field"><label for="f-cls">Class code</label><input id="f-cls" maxlength="12" autocapitalize="characters" spellcheck="false" value="'+esc(f.cls)+'"><small>'+(up?'Ask your teacher. 3 to 12 letters or numbers.':'The class code you made your account with.')+'</small></div>':'')+

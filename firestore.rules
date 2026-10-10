@@ -1,5 +1,5 @@
 rules_version = '2';
-// Arcade hub: ONE Firebase project for every arcade game (Elemental Arcade 'chem', Cell Arcade 'bio', ...).
+// Arcade hub: ONE Firebase project for every arcade game (Elemental Arcade 'chem', Cell Arcade 'bio', Space Arcade 'space', ...).
 // SHARED FILE: every game repo carries the same copy. design/binder-spec.md explains the layout.
 // tests/fake/rules.js is a JS port of this file; change both together.
 service cloud.firestore {
@@ -17,7 +17,7 @@ service cloud.firestore {
     function playerDoc(uid) { return /databases/$(database)/documents/players/$(uid); }
 
     // Games that may store progress (games/{gameId}) and host VS matches. Add a game here when it ships.
-    function gameIds() { return ['chem', 'bio']; }
+    function gameIds() { return ['chem', 'bio', 'space']; }
 
     // VS decks and rooms per game. A match doc without 'game' is an Elemental match from before the Binder ('chem').
     // Review rooms are solo only and never appear here.
@@ -28,7 +28,10 @@ service cloud.firestore {
               && m.room in ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed'])
           || (gameOf(m) == 'bio'
               && m.deck in ['s20', 'cell', 'aa', 'tree', 'body', 'eco', 'all']
-              && m.room in ['function', 'code', 'codon', 'tree', 'kingdom', 'cellmap', 'plant', 'body', 'mixed']);
+              && m.room in ['function', 'code', 'codon', 'tree', 'kingdom', 'cellmap', 'plant', 'body', 'mixed'])
+          || (gameOf(m) == 'space'
+              && m.deck in ['s20', 'wx', 'rocks', 'solar', 'stars', 'explore', 'all']
+              && m.room in ['clue', 'code', 'order', 'solarmap', 'sort', 'layermap', 'rockgas', 'why', 'mixed']);
     }
 
     // Cleanup (vs.js sweep): a match is dead once it has ended (expired, done or abandoned) and was created more
@@ -60,7 +63,10 @@ service cloud.firestore {
     function freeIcons() { return ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket',
                             'flask', 'crown', 'shield', 'spark', 'wave', 'bio:cell', 'bio:dna', 'bio:leaf', 'bio:microscope', 'bio:mito',
                             'bio:petri', 'bio:heart', 'bio:neuron', 'bio:sprout', 'bio:mushroom', 'bio:paw', 'bio:feather',
-                            'bio:seashell', 'bio:bee', 'bio:eye', 'bio:bone']; }
+                            'bio:seashell', 'bio:bee', 'bio:eye', 'bio:bone', 'space:rocket', 'space:comet', 'space:ringed',
+                            'space:crescent', 'space:telescope', 'space:satellite', 'space:helmet', 'space:rover', 'space:sun',
+                            'space:earth', 'space:cloud', 'space:geode', 'space:snowflake', 'space:lightning', 'space:fossil',
+                            'space:compass']; }
     function packIcons() { return ['boba', 'camera', 'cat', 'dice', 'dog', 'donut', 'pizza', 'note', 'sneaker', 'headphones', 'soccer', 'hoop',
                             'cactus', 'shades', 'bulb', 'skateboard', 'boombox', 'controller', 'vinyl', 'guitar', 'fox', 'panda',
                             'plane', 'rainbow', 'joystick', 'trophy', 'robot', 'planet', 'axolotl', 'ufo', 'volcano', 'chest', 'dragon',
@@ -68,24 +74,41 @@ service cloud.firestore {
                             'bio:sunflower', 'bio:penguin', 'bio:owl', 'bio:starfish', 'bio:bunny', 'bio:hedgehog', 'bio:ant',
                             'bio:clover', 'bio:crab', 'bio:jellyfish', 'bio:octopus', 'bio:chameleon', 'bio:koala', 'bio:sloth',
                             'bio:hummingbird', 'bio:seahorse', 'bio:mantis', 'bio:flytrap', 'bio:coral', 'bio:tardigrade', 'bio:narwhal',
-                            'bio:whale', 'bio:peacock', 'bio:firefly', 'bio:anglerfish', 'bio:mammoth', 'bio:megalodon', 'atom-gold',
-                            'bolt-gold', 'beaker-gold', 'crystal-gold', 'flame-gold', 'droplet-gold', 'magnet-gold', 'moon-gold',
-                            'star-gold', 'comet-gold', 'rocket-gold', 'flask-gold', 'crown-gold', 'shield-gold', 'spark-gold',
-                            'wave-gold', 'bio:cell-gold', 'bio:dna-gold', 'bio:leaf-gold', 'bio:microscope-gold', 'bio:mito-gold',
-                            'bio:petri-gold', 'bio:heart-gold', 'bio:neuron-gold', 'bio:sprout-gold', 'bio:mushroom-gold',
-                            'bio:paw-gold', 'bio:feather-gold', 'bio:seashell-gold', 'bio:bee-gold', 'bio:eye-gold', 'bio:bone-gold',
-                            'boba-gold', 'camera-gold', 'cat-gold', 'dice-gold', 'dog-gold', 'donut-gold', 'pizza-gold', 'note-gold',
-                            'sneaker-gold', 'headphones-gold', 'soccer-gold', 'hoop-gold', 'cactus-gold', 'shades-gold', 'bulb-gold',
-                            'skateboard-gold', 'boombox-gold', 'controller-gold', 'vinyl-gold', 'guitar-gold', 'fox-gold', 'panda-gold',
-                            'plane-gold', 'rainbow-gold', 'joystick-gold', 'trophy-gold', 'robot-gold', 'planet-gold', 'axolotl-gold',
-                            'ufo-gold', 'volcano-gold', 'chest-gold', 'dragon-gold', 'dino-gold', 'bio:ladybug-gold', 'bio:frog-gold',
-                            'bio:turtle-gold', 'bio:snail-gold', 'bio:butterfly-gold', 'bio:succulent-gold', 'bio:acorn-gold',
-                            'bio:sunflower-gold', 'bio:penguin-gold', 'bio:owl-gold', 'bio:starfish-gold', 'bio:bunny-gold',
-                            'bio:hedgehog-gold', 'bio:ant-gold', 'bio:clover-gold', 'bio:crab-gold', 'bio:jellyfish-gold',
-                            'bio:octopus-gold', 'bio:chameleon-gold', 'bio:koala-gold', 'bio:sloth-gold', 'bio:hummingbird-gold',
-                            'bio:seahorse-gold', 'bio:mantis-gold', 'bio:flytrap-gold', 'bio:coral-gold', 'bio:tardigrade-gold',
-                            'bio:narwhal-gold', 'bio:whale-gold', 'bio:peacock-gold', 'bio:firefly-gold', 'bio:anglerfish-gold',
-                            'bio:mammoth-gold', 'bio:megalodon-gold']; }
+                            'bio:whale', 'bio:peacock', 'bio:firefly', 'bio:anglerfish', 'bio:mammoth', 'bio:megalodon',
+                            'space:asteroid', 'space:meteor', 'space:crater', 'space:nebula', 'space:aurora', 'space:tornado',
+                            'space:umbrella', 'space:thermometer', 'space:mountain', 'space:iceberg', 'space:hammer', 'space:windsock',
+                            'space:starmap', 'space:raindrop', 'space:crystal', 'space:cluster', 'space:lander', 'space:probe',
+                            'space:station', 'space:spaceplane', 'space:observatory', 'space:volcano', 'space:geyser', 'space:hurricane',
+                            'space:trilobite', 'space:eclipse', 'space:blackhole', 'space:pulsar', 'space:supernova', 'space:spiral',
+                            'space:bluegiant', 'space:icemoon', 'space:heartworld', 'space:goldenrecord', 'atom-gold', 'bolt-gold',
+                            'beaker-gold', 'crystal-gold', 'flame-gold', 'droplet-gold', 'magnet-gold', 'moon-gold', 'star-gold',
+                            'comet-gold', 'rocket-gold', 'flask-gold', 'crown-gold', 'shield-gold', 'spark-gold', 'wave-gold',
+                            'bio:cell-gold', 'bio:dna-gold', 'bio:leaf-gold', 'bio:microscope-gold', 'bio:mito-gold', 'bio:petri-gold',
+                            'bio:heart-gold', 'bio:neuron-gold', 'bio:sprout-gold', 'bio:mushroom-gold', 'bio:paw-gold',
+                            'bio:feather-gold', 'bio:seashell-gold', 'bio:bee-gold', 'bio:eye-gold', 'bio:bone-gold',
+                            'space:rocket-gold', 'space:comet-gold', 'space:ringed-gold', 'space:crescent-gold', 'space:telescope-gold',
+                            'space:satellite-gold', 'space:helmet-gold', 'space:rover-gold', 'space:sun-gold', 'space:earth-gold',
+                            'space:cloud-gold', 'space:geode-gold', 'space:snowflake-gold', 'space:lightning-gold', 'space:fossil-gold',
+                            'space:compass-gold', 'boba-gold', 'camera-gold', 'cat-gold', 'dice-gold', 'dog-gold', 'donut-gold',
+                            'pizza-gold', 'note-gold', 'sneaker-gold', 'headphones-gold', 'soccer-gold', 'hoop-gold', 'cactus-gold',
+                            'shades-gold', 'bulb-gold', 'skateboard-gold', 'boombox-gold', 'controller-gold', 'vinyl-gold',
+                            'guitar-gold', 'fox-gold', 'panda-gold', 'plane-gold', 'rainbow-gold', 'joystick-gold', 'trophy-gold',
+                            'robot-gold', 'planet-gold', 'axolotl-gold', 'ufo-gold', 'volcano-gold', 'chest-gold', 'dragon-gold',
+                            'dino-gold', 'bio:ladybug-gold', 'bio:frog-gold', 'bio:turtle-gold', 'bio:snail-gold', 'bio:butterfly-gold',
+                            'bio:succulent-gold', 'bio:acorn-gold', 'bio:sunflower-gold', 'bio:penguin-gold', 'bio:owl-gold',
+                            'bio:starfish-gold', 'bio:bunny-gold', 'bio:hedgehog-gold', 'bio:ant-gold', 'bio:clover-gold',
+                            'bio:crab-gold', 'bio:jellyfish-gold', 'bio:octopus-gold', 'bio:chameleon-gold', 'bio:koala-gold',
+                            'bio:sloth-gold', 'bio:hummingbird-gold', 'bio:seahorse-gold', 'bio:mantis-gold', 'bio:flytrap-gold',
+                            'bio:coral-gold', 'bio:tardigrade-gold', 'bio:narwhal-gold', 'bio:whale-gold', 'bio:peacock-gold',
+                            'bio:firefly-gold', 'bio:anglerfish-gold', 'bio:mammoth-gold', 'bio:megalodon-gold', 'space:asteroid-gold',
+                            'space:meteor-gold', 'space:crater-gold', 'space:nebula-gold', 'space:aurora-gold', 'space:tornado-gold',
+                            'space:umbrella-gold', 'space:thermometer-gold', 'space:mountain-gold', 'space:iceberg-gold',
+                            'space:hammer-gold', 'space:windsock-gold', 'space:starmap-gold', 'space:raindrop-gold',
+                            'space:crystal-gold', 'space:cluster-gold', 'space:lander-gold', 'space:probe-gold', 'space:station-gold',
+                            'space:spaceplane-gold', 'space:observatory-gold', 'space:volcano-gold', 'space:geyser-gold',
+                            'space:hurricane-gold', 'space:trilobite-gold', 'space:eclipse-gold', 'space:blackhole-gold',
+                            'space:pulsar-gold', 'space:supernova-gold', 'space:spiral-gold', 'space:bluegiant-gold',
+                            'space:icemoon-gold', 'space:heartworld-gold', 'space:goldenrecord-gold']; }
     // END GENERATED
     // Unlocked icons on a player doc: the Binder's 'unlocked', or a pre-Binder Elemental doc's progress.unlocked.
     function unlockedOf(d) { return d.get('unlocked', []).concat(d.get('progress', {}).get('unlocked', [])); }
