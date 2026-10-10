@@ -1114,7 +1114,7 @@ function toast(msg){
 }
 
 /* ---------- state ---------- */
-const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
+const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',needCls:false,authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
 const cur=()=>V.qs[V.qi];
 const roomOf=id=>ROOMS.find(r=>r.id===id);
 const RPC={};
@@ -1350,14 +1350,15 @@ function accountHTML(){
     '<p class="sub" id="syncmsg" role="status" style="margin-top:10px">'+(SYNCTXT[SYNC]||'')+'</p>'+
     '<div class="actions" style="margin-top:18px"><button class="btn" data-act="home">Keep playing</button><button class="btn ghost" data-act="signout">Sign out</button></div></section>';
   }
-  const f=V.form,up=V.authTab==='up';
+  // Class code: always on New account; on Sign in only after the nickname lookup could not find the account.
+  const f=V.form,up=V.authTab==='up',askCls=up||V.needCls;
   const gc=guestCount();const bring=up&&gc>0?'<label class="chk"><input type="checkbox" id="f-bring" '+(f.bring?'checked':'')+'> Add the '+gc+' card'+(gc>1?'s':'')+' already on this device to my account</label>':'';
   return '<section class="panel auth"><div class="qmeta">Account</div><h1 class="prompt">Save your binder</h1>'+
   '<p class="sub" data-ui="device-summary">On this device: '+gc+' card'+(gc===1?'':'s')+', Lv '+levelInfo(S.xp).lvl+'.</p>'+acctIconHTML()+
-  '<p class="sub">Sign in with your class code, a nickname and a PIN. No email needed. Use a nickname, not your real name.</p>'+
+  '<p class="sub">'+(up?'Make an account with your class code, a nickname and a PIN.':'Sign in with your nickname and PIN.')+' No email needed. Use a nickname, not your real name.</p>'+
   '<div class="tabs" role="tablist" style="margin:14px 0"><button class="tab'+(up?'':' on')+'" data-act="authtab" data-id="in">Sign in</button><button class="tab'+(up?' on':'')+'" data-act="authtab" data-id="up">New account</button></div>'+
   '<form id="authform" autocomplete="off"><div class="fields">'+
-  '<div class="field"><label for="f-cls">Class code</label><input id="f-cls" maxlength="12" autocapitalize="characters" spellcheck="false" value="'+esc(f.cls)+'"><small>Ask your teacher. 3 to 12 letters or numbers.</small></div>'+
+  (askCls?'<div class="field"><label for="f-cls">Class code</label><input id="f-cls" maxlength="12" autocapitalize="characters" spellcheck="false" value="'+esc(f.cls)+'"><small>'+(up?'Ask your teacher. 3 to 12 letters or numbers.':'The class code you made your account with.')+'</small></div>':'')+
   '<div class="field"><label for="f-nick">Nickname</label><input id="f-nick" maxlength="16" autocapitalize="none" spellcheck="false" value="'+esc(f.nick)+'"><small>2 to 16 letters or numbers.</small></div>'+
   '<div class="field"><label for="f-pin">PIN</label><input id="f-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" value="'+esc(f.pin)+'"><small>'+(up?'Choose 4 to 6 digits. Remember it, there is no reset.':'Your 4 to 6 digit PIN.')+'</small></div></div>'+
   '<label class="chk"><input type="checkbox" id="f-keep" '+(f.keep?'checked':'')+'> Keep me signed in on this device</label>'+bring+
@@ -1570,7 +1571,7 @@ const onClick=e=>{
   else if(a==='binder'){V.anim='screen';V.screen='binder';V.modal=null;render();window.scrollTo(0,0)}
   else if(a==='tab'){V.tab=id;V.anim='screen';render()}
   else if(a==='account'||a==='signin'){V.anim='screen';V.screen='account';V.authErr='';V.modal=null;render();window.scrollTo(0,0)}
-  else if(a==='authtab'){V.authTab=id;V.authErr='';render()}
+  else if(a==='authtab'){V.authTab=id;V.authErr='';V.needCls=false;render()}
   else if(a==='signout'){Cloud.signOut()}
   else if(a==='vs'){if(window.VSArena)window.VSArena.open()}
   else if(a==='mute'){S.mute=!S.mute;save();render()}
@@ -1608,8 +1609,8 @@ app.addEventListener('submit',async e=>{
   if(e.target.id!=='authform')return;
   e.preventDefault();
   const f=V.form,c=norm(f.cls),n=norm(f.nick),pin=String(f.pin||'');
-  const up=V.authTab==='up';
-  if(!/^[a-z0-9]{3,12}$/.test(c)){V.authErr='Class code needs 3 to 12 letters or numbers.';render();return}
+  const up=V.authTab==='up',askCls=up||V.needCls;
+  if(askCls&&!/^[a-z0-9]{3,12}$/.test(c)){V.authErr='Class code needs 3 to 12 letters or numbers.';render();return}
   if(!/^[a-z0-9]{2,16}$/.test(n)){V.authErr='Nickname needs 2 to 16 letters or numbers.';render();return}
   if(!/^\d{4,6}$/.test(pin)){V.authErr='PIN needs 4 to 6 digits.';render();return}
   V.authErr='';V.authBusy=true;render();
@@ -1618,12 +1619,16 @@ app.addEventListener('submit',async e=>{
       const bring=f.bring&&guestCount()>0;const g=bring?readGuest():null;
       await Cloud.signUp(c,n,pin,f.keep,g?{owned:g.owned||{},miss:g.miss||{},stars:g.stars||{},xp:g.xp||0,rounds:g.rounds||0,best:g.best||0}:null,S.icon);
       if(bring){try{localStorage.removeItem(KEY)}catch(x){}}
-    }else await Cloud.signIn(c,n,pin,f.keep);
-    V.form.pin='';
+    }else await Cloud.signIn(n,pin,f.keep,askCls?c:'');
+    V.form.pin='';V.needCls=false;
   }catch(err){
     const code=String(err&&err.code||'');
-    V.authErr=/email-already-in-use/.test(code)?'That nickname is taken in this class. Pick another, or use Sign in if it is yours.':
-      /invalid-credential|user-not-found|wrong-password|invalid-login/.test(code)?'The class code, nickname or PIN is not right.':
+    // A nickname the lookup cannot find (or finds in another class) may be an older account: ask for the class code.
+    const bad=/invalid-credential|user-not-found|wrong-password|invalid-login/.test(code);
+    if(!up&&(bad||/need-class-code/.test(code))&&!V.needCls){V.needCls=true;V.authBusy=false;
+      V.authErr=bad?'The nickname or PIN is not right. If you are sure they are, add your class code too.':'We could not find that nickname. Add your class code to sign in.';render();return}
+    V.authErr=/email-already-in-use/.test(code)?'That nickname is taken. Pick another, or use Sign in if it is yours.':
+      bad?'The class code, nickname or PIN is not right.':
       /too-many-requests/.test(code)?'Too many tries. Wait a minute and try again.':
       /network/.test(code)?'Cannot reach the server. Check your internet connection.':
       'Something went wrong. Try again.';

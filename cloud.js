@@ -1,6 +1,7 @@
 // Optional cloud saving for Elemental Arcade (Firebase Auth + Firestore).
-// Students sign in with class code + nickname + PIN. Firebase needs an email and password,
+// Students sign up with class code + nickname + PIN. Firebase needs an email and password,
 // so those three are turned into a private, made-up email and password. No real email is stored.
+// Sign-in needs only nickname + PIN: /names/{nickname} holds the class code, written at sign-up.
 import { firebaseConfig } from './firebase-config.js';
 
 const V = '10.14.1';
@@ -87,6 +88,17 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     }
   }
   const who = u => { const [cls, nick] = u.email.split('@')[0].split('_'); return { cls, nick }; };
+  // Nickname lookup. Missing (account made before the lookup, or rules not yet published) means the student
+  // must type their class code once; signing in with it then claims the name. Best effort, never throws.
+  const nameRef = n => F.doc(db, 'names', n);
+  async function lookupCls(n) { try { const s = await F.getDoc(nameRef(n)); return s.exists() ? s.data().cls : null; } catch (e) { return null; } }
+  const claimed = new Set();
+  async function claimName(u) {
+    if (!u || u.isAnonymous || claimed.has(u.uid)) return;
+    claimed.add(u.uid);
+    const { cls, nick } = who(u);
+    try { if (!(await F.getDoc(nameRef(nick))).exists()) await F.setDoc(nameRef(nick), { cls, uid: u.uid }); } catch (e) { /* taken or old rules */ }
+  }
 
   const changeCbs = [], statusCbs = [];
   let last = null, busy = false, timer = null, pending = null, pendingIcon = null;
@@ -135,6 +147,7 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
       if (s.exists()) { const d = s.data(); prog = d.progress || null; meta = { icon: typeof d.icon === 'string' ? d.icon : null, updated: toMs(d.updated) }; }
     } catch (e) { setStatus('offline'); }
     emit(who(u), prog, meta);
+    claimName(u);
   });
 
   window.Cloud = {
@@ -160,6 +173,8 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     _merge: { progress: merge, icon: mergeIcon },
     async signUp(cls, nick, pin, keep, initial, icon) {
       const c = norm(cls), n = norm(nick);
+      // Nicknames are unique across classes now that sign-in has no class code.
+      if (await lookupCls(n)) { const e = new Error('nickname taken'); e.code = 'auth/email-already-in-use'; throw e; }
       busy = true;
       try {
         await A.setPersistence(auth, keep ? A.browserLocalPersistence : A.browserSessionPersistence);
@@ -168,10 +183,13 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
         await setPlayer(F.doc(db, 'players', cred.user.uid), { progress, nick: n, cls: c, icon: ic, updated: F.serverTimestamp() });
         busy = false;
         emit({ cls: c, nick: n }, progress, { icon: ic, updated: Date.now() });
+        await claimName(cred.user);
       } finally { busy = false; }
     },
-    async signIn(cls, nick, pin, keep) {
-      const c = norm(cls), n = norm(nick);
+    // cls is optional: without it the class code comes from /names. Throws auth/need-class-code if not found.
+    async signIn(nick, pin, keep, cls) {
+      const n = norm(nick), c = norm(cls) || await lookupCls(n);
+      if (!c) { const e = new Error('class code needed'); e.code = 'auth/need-class-code'; throw e; }
       await A.setPersistence(auth, keep ? A.browserLocalPersistence : A.browserSessionPersistence);
       await A.signInWithEmailAndPassword(auth, email(c, n), pass(pin, c));
     },

@@ -19,9 +19,13 @@ Until you do this, the game works as a guest and saves only in each browser.
 
 ## How sign-in works
 
-Students enter a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase, so no real email or name is stored. Each student can read and write only their own save.
+Students make an account with a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase, so no real email or name is stored. Each student can read and write only their own save.
 
-- Anyone can invent a class code. It only keeps nicknames from clashing between classes.
+Signing in needs only the nickname and PIN. At sign-up the game stores `/names/{nickname}` with the class code, and sign-in looks it up. Nicknames are therefore unique across all classes for new accounts.
+
+- Anyone can invent a class code. It is shown on the account screen.
+- Accounts made before the lookup existed are asked for their class code once. After that sign-in, the nickname is claimed and the class code is not needed again. (A student already signed in on a device claims it on their next visit.)
+- After this change, publish the updated `firestore.rules`. Until then, sign-in falls back to asking for the class code.
 - There is no PIN reset. To let a student start over, delete their user under Authentication > Users and their document under Firestore > players.
 - Tell students to use a nickname, not their real name.
 

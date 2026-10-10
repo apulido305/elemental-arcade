@@ -39,10 +39,12 @@ test('sign up, sign out, sign in again through the account screen; progress come
   await dev.page.click('[data-act="signout"]');
   await expect(dev.page.locator('[data-act="account"]')).toHaveText(/Sign in/);
   expect(await dev.currentUser()).toBeNull();
-  // wrong PIN shows the friendly message, right PIN signs in
+  // sign-in asks only for nickname + PIN; a wrong PIN shows the friendly message, right PIN signs in
+  expect(arena.backend.adminGet('names/ada')).toMatchObject({ cls: 'class1' });
   await dev.page.click('[data-act="account"]');
   await dev.page.click('[data-act="authtab"][data-id="in"]');
-  await dev.page.fill('#f-cls', 'class1'); await dev.page.fill('#f-nick', 'ada'); await dev.page.fill('#f-pin', '9999');
+  await expect(dev.page.locator('#f-cls')).toHaveCount(0);
+  await dev.page.fill('#f-nick', 'ada'); await dev.page.fill('#f-pin', '9999');
   await dev.page.click('#authform button[type="submit"]');
   await expect(dev.page.locator('#authform')).toContainText(/not right/i);
   await dev.page.fill('#f-pin', '1234');
@@ -51,6 +53,38 @@ test('sign up, sign out, sign in again through the account screen; progress come
   await expect.poll(() => dev.page.evaluate(() => Arcade.S.xp)).toBeGreaterThanOrEqual(xp);
   expect(await dev.currentUser()).toMatchObject({ isAnonymous: false });
   expect(arena.backend.denials).toEqual([]);
+  expect(dev.errors).toEqual([]);
+});
+
+test('an account made before the nickname lookup signs in with its class code once, then without it', async ({ arena }) => {
+  await arena.seedUser('class1', 'old', '4321');                     // scripted sign-up: no /names doc, like older accounts
+  expect(arena.backend.adminGet('names/old')).toBeNull();
+  const dev = await arena.device({ width: PHONE });
+  await dev.goto('/');
+  await dev.page.click('[data-act="account"]');
+  await dev.page.fill('#f-nick', 'old'); await dev.page.fill('#f-pin', '4321');
+  await dev.page.click('#authform button[type="submit"]');
+  await expect(dev.page.locator('#authform')).toContainText(/add your class code/i);
+  await dev.page.fill('#f-cls', 'class1');
+  await dev.page.click('#authform button[type="submit"]');
+  await expect(dev.page.locator('[data-act="account"]')).toContainText('old', { ignoreCase: true });
+  await expect.poll(() => arena.backend.adminGet('names/old')).toMatchObject({ cls: 'class1' });
+  await dev.page.evaluate(() => Cloud.signOut());
+  await dev.signIn('old', '4321');
+  expect(arena.backend.denials).toEqual([]);
+  expect(dev.errors).toEqual([]);
+});
+
+test('a nickname is unique across classes at sign-up', async ({ arena }) => {
+  const dev = await arena.device({ width: PHONE });
+  await dev.goto('/');
+  await dev.signUpViaUI('class1', 'ada', '1234');
+  await dev.page.evaluate(() => Cloud.signOut());
+  await dev.page.click('[data-act="account"]');
+  await dev.page.click('[data-act="authtab"][data-id="up"]');
+  await dev.page.fill('#f-cls', 'class2'); await dev.page.fill('#f-nick', 'Ada'); await dev.page.fill('#f-pin', '5555');
+  await dev.page.click('#authform button[type="submit"]');
+  await expect(dev.page.locator('#authform')).toContainText(/nickname is taken/i);
   expect(dev.errors).toEqual([]);
 });
 

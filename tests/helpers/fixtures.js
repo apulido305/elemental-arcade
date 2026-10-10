@@ -29,8 +29,9 @@ export class Device {
     await this.page.evaluate(([c, n, p]) => window.Cloud.signUp(c, n, p, true, null), [cls, nick, pin]);
     await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true });
   }
-  async signIn(cls, nick, pin = '1234', keep = true) {
-    await this.page.evaluate(([c, n, p, k]) => window.Cloud.signIn(c, n, p, k), [cls, nick, pin, keep]);
+  /** Sign in through Cloud.signIn with nickname + PIN only (the class code comes from /names). */
+  async signIn(nick, pin = '1234', keep = true) {
+    await this.page.evaluate(([n, p, k]) => window.Cloud.signIn(n, p, k), [nick, pin, keep]);
     await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true });
   }
   /** Sign up through the real account screen UI. */
