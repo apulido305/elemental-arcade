@@ -83,7 +83,7 @@ export class Backend {
   _ctx(auth, time, post) {
     const pre = p => this._doc(p), after = p => (post && post.has(p) ? post.get(p) : pre(p));
     return {
-      ts: this.timeScale, uid: auth && auth.uid, anon: !!(auth && auth.anon), signedIn: !!auth, time,
+      ts: this.timeScale, uid: auth && auth.uid, email: auth && auth.email, anon: !!(auth && auth.anon), signedIn: !!auth, time,
       get: p => clone(pre(p)), exists: p => pre(p) !== null,
       getAfter: p => clone(after(p)), existsAfter: p => after(p) !== null
     };

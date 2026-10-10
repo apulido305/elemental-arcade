@@ -126,7 +126,7 @@ test('signed-in pick is saved on the player doc, survives later progress saves, 
   const dev2 = await arena.device({ width: PHONE });
   await dev2.goto('/');
   expect(await headerIcon(dev2.page)).toBe('atom');
-  await dev2.signIn('class1', 'ada', '1234');
+  await dev2.signIn('ada', '1234');
   await expect.poll(() => headerIcon(dev2.page)).toBe('comet');
   // signing out brings back this browser's guest icon, not the account's
   await dev2.page.evaluate(() => Cloud.signOut());

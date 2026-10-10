@@ -92,6 +92,21 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------------------------------
+    // /names/{nick}: nickname -> class code, so sign-in needs only nickname + PIN (cloud.js).
+    // Anyone may read one name (sign-in happens before auth); nobody may list them. An account may claim
+    // only its own nickname and class, as encoded in its made-up sign-in email. First claim wins, forever.
+    // ---------------------------------------------------------------------------------------------
+    match /names/{nick} {
+      allow get: if true;
+      allow create: if isAccount()
+        && request.resource.data.keys().hasOnly(['cls', 'uid'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.cls is string
+        && request.auth.token.email == request.resource.data.cls + '_' + nick + '@players.elemental-arcade.example';
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // /matches/{code}: one VS arena. The 6-character code is the secret needed to join.
     // ---------------------------------------------------------------------------------------------
     match /matches/{code} {

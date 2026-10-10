@@ -283,7 +283,7 @@ test.describe('daily pack', () => {
     const uid = await p.evaluate(() => Cloud.uid());
     await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packLog || []).includes(today), { timeout: 8000 }).toBe(true);
     const other = await arena.device({ width: PHONE, dailyReminder: true }), q = other.page;
-    await other.goto('/'); await other.signIn('class1', 'daily');
+    await other.goto('/'); await other.signIn('daily');
     await expect(q.locator('[data-ui="daily-modal"]')).toHaveCount(0);                 // already claimed today
     expect(await q.evaluate(() => Arcade.dailyPack())).toBe(false);
   });

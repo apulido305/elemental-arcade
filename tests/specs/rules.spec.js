@@ -591,3 +591,21 @@ test.describe('rules: cleanup of dead matches', () => {
     expect(arena.backend.adminGet('matches/STUCKA').status).toBe('abandoned');
   });
 });
+
+test.describe('rules: /names (nickname -> class code)', () => {
+  test('anyone reads one name; an account claims only its own nickname and class, once; nobody lists or changes them', async ({ arena }) => {
+    const ann = arena.client('ann'); await ann.signUp('class1', 'ann');
+    const F = ann.F, ref = c => c.F.doc(c.db, 'names', 'ann');
+    await expectDenied(F.setDoc(F.doc(ann.db, 'names', 'bob'), { cls: 'class1', uid: ann.uid }), 'auth email');     // someone else's nickname
+    await expectDenied(F.setDoc(ref(ann), { cls: 'class2', uid: ann.uid }), 'auth email');                         // wrong class
+    await expectDenied(F.setDoc(ref(ann), { cls: 'class1', uid: 'other' }), 'uid == auth.uid');
+    await expectDenied(F.setDoc(ref(ann), { cls: 'class1', uid: ann.uid, extra: 1 }), 'keys hasOnly');
+    await F.setDoc(ref(ann), { cls: 'class1', uid: ann.uid });
+    await expectDenied(F.setDoc(ref(ann), { cls: 'class1', uid: ann.uid }), "no 'update' rule");
+    await expectDenied(F.deleteDoc(ref(ann)), "no 'delete' rule");
+    await expectDenied(F.getDocs(F.collection(ann.db, 'names')), "no 'list' rule");
+    const g = await guest(arena);
+    expect((await g.F.getDoc(ref(g))).data()).toEqual({ cls: 'class1', uid: ann.uid });
+    await expectDenied(g.F.setDoc(g.F.doc(g.db, 'names', 'zed'), { cls: 'class1', uid: g.uid }), 'not anonymous');
+  });
+});

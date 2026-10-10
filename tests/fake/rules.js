@@ -8,7 +8,7 @@
 // Anything not matched by a RULES entry is denied (Firestore default).
 //
 // Context c:
-//   c.uid, c.anon (anonymous provider), c.signedIn      c.params (path wildcards)   c.time (request.time ms)
+//   c.uid, c.email, c.anon (anonymous provider), c.signedIn      c.params (path wildcards)   c.time (request.time ms)
 //   c.res  resource.data (before, or null)              c.inc request.resource.data (after the write, or null)
 //   c.q    {wheres:[{field,op,value}], limit}  for list
 //   c.get(path)/c.exists(path)  state BEFORE the commit;  c.getAfter(path)/c.existsAfter(path)  state AFTER it
@@ -254,8 +254,15 @@ const playersWrite = playersOwn.concat([
   ['progress.finishes is a map; finishOn values are finish ids', c => (!('finishes' in c.inc.progress) || isObj(c.inc.progress.finishes)) && (!('finishOn' in c.inc.progress) || (isObj(c.inc.progress.finishOn) && Object.values(c.inc.progress.finishOn).every(f => FINISH_IDS.includes(f))))]
 ]);
 
+// ---- /names/{nick}: nickname -> class code for sign-in. Public get, own claim only, never changed ----
+const nameCreate = [signedIn, notAnon,
+  ['keys hasOnly cls, uid', c => hasOnly(c.inc, ['cls', 'uid'])],
+  ['uid == auth.uid', c => c.inc.uid === c.uid],
+  ['auth email == {cls}_{nick}@players.elemental-arcade.example', c => typeof c.inc.cls === 'string' && c.email === c.inc.cls + '_' + c.params.nick + '@players.elemental-arcade.example']];
+
 export const RULES = [
   { path: 'players/{uid}', get: playersOwn, create: playersWrite, update: playersWrite },
+  { path: 'names/{nick}', get: [['anyone', () => true]], create: nameCreate },
   {
     path: 'matches/{code}',
     get: [signedIn],

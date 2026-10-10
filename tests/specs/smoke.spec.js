@@ -45,7 +45,7 @@ test('sign up through the fake (account screen), cloud save lands in /players, s
   // second device signs in as the same account and sees the cloud progress
   const dev2 = await arena.device({ width: PHONE });
   await dev2.goto('/');
-  await dev2.signIn('class1', 'ada', '1234');
+  await dev2.signIn('ada', '1234');
   await dev2.page.click('[data-act="account"]');
   await expect(dev2.page.locator('main')).toContainText('ada', { ignoreCase: true });
   expect(dev.errors).toEqual([]); expect(dev2.errors).toEqual([]);
