@@ -288,6 +288,90 @@ main.enter>*{animation:fadeIn .3s backwards}
 .qn{min-width:48px;min-height:44px;padding:0 8px;border-radius:12px;background:var(--panel2);color:var(--text);border:2px solid var(--line);font:400 20px/1 var(--display);cursor:pointer}
 .qn.on{background:var(--gold);color:#241c00;border-color:var(--gold)}
 .qn:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+/* ---------- packs ---------- */
+.av{position:relative}
+.av img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
+/* Gold chase icon: the rare art plus a gold ring, a slow foil sheen and a small gold corner. */
+.av.gold{border-radius:50%;box-shadow:0 0 0 2px #f3dd7a,0 0 10px rgba(243,221,122,.55);background:radial-gradient(circle at 50% 40%,#3a3210,#0b1030 70%);overflow:hidden}
+.av.gold::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,transparent 35%,rgba(255,250,220,.6) 48%,transparent 61%);background-size:260% 100%;animation:gsheen 3.4s linear infinite}
+.av.gold::before{content:'';position:absolute;right:0;top:0;width:28%;height:28%;background:linear-gradient(225deg,#fff3b0,#e0b81a 55%,transparent 56%);z-index:1;pointer-events:none}
+@keyframes gsheen{from{background-position:130% 0}to{background-position:-130% 0}}
+.iconbtn{position:relative}
+.pbadge{position:absolute;top:-8px;right:-8px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--gold);color:#241c00;font:400 14px/22px var(--display);box-shadow:0 0 0 2px var(--bg0);animation:pbpulse 1.6s ease-in-out infinite}
+@keyframes pbpulse{50%{box-shadow:0 0 0 2px var(--bg0),0 0 12px 3px rgba(243,221,122,.7)}}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,140%);z-index:90;max-width:calc(100% - 32px);padding:12px 18px;border-radius:14px;background:var(--gold);color:#241c00;font:700 15px/1.3 var(--body);box-shadow:0 6px 0 var(--goldd),0 10px 30px rgba(0,0,0,.4);transition:transform .25s ease-out;pointer-events:none}
+#toast.on{transform:translate(-50%,0)}
+.packs{margin-bottom:22px}
+.packs .h em{font-style:normal;color:var(--gold)}
+.packrow{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 14px}
+.minipack{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 14px 8px 8px;border-radius:14px;border:2px solid var(--gold);background:var(--panel2);color:var(--text);font:400 15px/1.2 var(--body);cursor:pointer;text-align:left}
+.minipack b{display:block;font:400 18px/1.1 var(--display);color:var(--gold);margin-top:2px}
+.odds{margin-top:6px}
+.odds summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font:400 19px/1.2 var(--display);color:var(--gold)}
+.oddsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0}
+.odds table{width:100%;border-collapse:collapse;font-size:14px}
+.odds caption{text-align:left;font:700 12px/1.6 var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--gold)}
+.odds td{padding:5px 6px;border-top:1px solid var(--line);vertical-align:top}
+.odds td.r{width:4.2em;text-align:right;font-family:'DM Mono',monospace;color:var(--gold);white-space:nowrap}
+.odds .feat{display:flex;align-items:center;gap:12px;margin:8px 0}
+.finrow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.finrow .btn{min-height:44px}
+.finrow .btn[aria-pressed="true"]{background:var(--gold);color:#241c00;border-color:var(--gold)}
+/* Finishes: cosmetic layers over the card art. */
+.cw[class*="fin-"]>.card::after{content:'';position:absolute;inset:0;border-radius:16px;pointer-events:none;z-index:3}
+.cw.fin-foil>.card::after{box-shadow:inset 0 0 0 6px rgba(225,232,255,.85);background:linear-gradient(115deg,transparent 22%,rgba(255,255,255,.55) 40%,rgba(190,215,255,.35) 50%,transparent 66%);background-size:260% 260%;mix-blend-mode:overlay;animation:finsheen 4.5s linear infinite}
+.cw.fin-holo>.card::after{background:linear-gradient(125deg,rgba(255,90,180,.38),rgba(243,221,122,.32) 25%,rgba(71,255,190,.32) 50%,rgba(127,209,240,.36) 75%,rgba(176,124,255,.38));mix-blend-mode:color-dodge;opacity:.85}
+.cw.fin-night>.card::after{box-shadow:inset 0 0 0 6px #0b1030,inset 0 0 18px rgba(127,209,240,.55);background:radial-gradient(1.6px 1.6px at 12% 18%,#fff 98%,transparent),radial-gradient(1.4px 1.4px at 82% 12%,#fff 98%,transparent),radial-gradient(1.8px 1.8px at 90% 62%,#fff 98%,transparent),radial-gradient(1.4px 1.4px at 8% 72%,#fff 98%,transparent),radial-gradient(1.2px 1.2px at 50% 95%,#fff 98%,transparent),linear-gradient(180deg,rgba(11,16,48,.28),transparent 30%,transparent 70%,rgba(11,16,48,.32))}
+.cw.fin-ember>.card::after{box-shadow:inset 0 0 0 6px #e8572b,inset 0 0 24px rgba(255,140,40,.8);background:linear-gradient(0deg,rgba(255,90,20,.32),transparent 42%)}
+@keyframes finsheen{from{background-position:120% 0}to{background-position:-120% 0}}
+/* Scene */
+body.pkopen{overflow:hidden}
+.pkscene [hidden]{display:none !important}   /* .btn sets display, which would otherwise beat the hidden attribute */
+.pkscene{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px 16px calc(20px + env(safe-area-inset-bottom));background:radial-gradient(90% 60% at 50% 40%,#26358f,rgba(5,8,28,.97) 75%);overflow-y:auto;animation:fadeIn .2s backwards}
+.pkclose{position:absolute;top:12px;right:12px;width:44px;height:44px}
+.pkwhy{margin:0;font:400 20px/1.2 var(--display);color:var(--gold);text-align:center}
+.pkhint{margin:0;color:var(--mute);font-size:14px;text-align:center;min-height:1.4em}
+.pkart{position:relative;display:block;overflow:hidden;border-radius:10px;background:linear-gradient(160deg,#1d2870,#0b1030 55%,#161f58);box-shadow:inset 0 0 0 3px #f3dd7a,inset 0 0 0 6px #0b1030,inset 0 0 0 8px #a98d1a}
+.pkart.lg{width:min(220px,58vw);aspect-ratio:3/4}
+.pkart.sm{width:34px;height:46px;border-radius:5px;flex:none;box-shadow:inset 0 0 0 2px #f3dd7a}
+.pkart.card{width:100%;height:100%;border-radius:10px}
+.pkfoil{position:absolute;inset:0;background:linear-gradient(115deg,transparent 20%,rgba(243,221,122,.0) 30%,rgba(255,240,180,.55) 45%,rgba(127,209,240,.35) 55%,transparent 70%);background-size:260% 260%;animation:finsheen 3.8s linear infinite;mix-blend-mode:screen}
+.pklogo{position:absolute;left:50%;top:44%;width:46%;transform:translate(-50%,-50%);color:#f3dd7a;filter:drop-shadow(0 0 10px rgba(243,221,122,.5))}
+.pklogo svg{width:100%;height:auto;display:block}
+.pkname{position:absolute;left:0;right:0;bottom:12%;text-align:center;font:400 clamp(12px,4.2vw,20px)/1.05 var(--display);letter-spacing:2px;color:#fdf6d8}
+.pkart.sm .pkname,.pkart.sm .pkcrimp,.pkart.card .pkname{display:none}
+.pkcrimp{position:absolute;left:0;right:0;height:10px;background:repeating-linear-gradient(90deg,#f3dd7a 0 6px,#a98d1a 6px 12px)}
+.pkcrimp.t{top:0}.pkcrimp.b{bottom:0}
+.pack{position:relative;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;filter:drop-shadow(0 18px 30px rgba(0,0,0,.5))}
+.pkstrip{position:absolute;left:0;right:0;top:0;height:16%;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,#f3dd7a 0 6px,#a98d1a 6px 12px);box-shadow:0 2px 0 rgba(0,0,0,.25);transition:transform .2s}
+.pack.torn .pkstrip{animation:tearoff .45s cubic-bezier(.3,.6,.4,1) forwards}
+.pack.torn .pkart{animation:packpop .5s ease-out forwards}
+.pack.torn::after{content:'';position:absolute;inset:-30%;border-radius:50%;background:radial-gradient(circle,rgba(255,243,176,.95),rgba(243,221,122,0) 60%);animation:flash .5s ease-out forwards;pointer-events:none}
+@keyframes tearoff{to{transform:translate(140%,-80%) rotate(32deg);opacity:0}}
+@keyframes packpop{40%{transform:scale(1.06)}to{transform:scale(.6);opacity:0}}
+@keyframes flash{from{opacity:0;transform:scale(.4)}35%{opacity:1}to{opacity:0;transform:scale(1.2)}}
+.pkcards{display:flex;gap:12px;justify-content:center;flex-wrap:nowrap;width:100%;max-width:560px}
+.pkcard{flex:0 1 160px;aspect-ratio:5/7;min-height:44px;padding:0;border:0;background:none;cursor:pointer;perspective:800px;animation:dealin .45s cubic-bezier(.2,.9,.3,1.15) calc(var(--d)*.14s) backwards}
+.pkin{position:relative;display:block;width:100%;height:100%;transform-style:preserve-3d;transition:transform .35s ease-out}
+.pkcard.up .pkin{transform:rotateY(180deg)}
+.pkcard.special.up .pkin{transition-duration:.7s}
+.pkback,.pkface{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.pkface{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;background:linear-gradient(170deg,#1d2870,#0b1030);box-shadow:inset 0 0 0 2px var(--line);color:var(--text);text-align:center}
+.pkcard.special.up .pkface{box-shadow:inset 0 0 0 2px #f3dd7a;animation:chase 1.4s .4s ease-in-out 2}
+@keyframes chase{50%{box-shadow:inset 0 0 0 2px #f3dd7a,0 0 26px 6px rgba(243,221,122,.75)}}
+.pkface b{font:400 clamp(13px,3.6vw,18px)/1.1 var(--display);color:var(--gold)}
+.pkface small{font-size:12px;color:var(--mute);line-height:1.2}
+.pkface .cw{margin:-2px 0}
+.pkxp{font:400 clamp(28px,8vw,42px)/1 var(--display);color:var(--gold)}
+.pkxp small{font-size:.45em;margin-left:3px}
+@keyframes dealin{from{transform:translateY(-60px) scale(.6) rotate(-8deg);opacity:0}}
+@media (max-width:420px){.pkface .cw{--cs:.24 !important}}
+@media (prefers-reduced-motion: reduce){
+  .av.gold::after,.pbadge,.pkfoil,.cw.fin-foil>.card::after{animation:none}
+  .pkscene,.pkcard,.pkcard.special.up .pkface{animation:none}
+  .pkin{transition:none}
+}
+
 .step{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin-right:8px;border-radius:50%;background:var(--gold);color:#241c00;font:400 18px/1 var(--display);vertical-align:3px}
 .roomstat{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);color:var(--text)}
 .roomstat:empty{display:none}
@@ -471,23 +555,49 @@ const ICONS=[
 ];
 const ICON_IDS=ICONS.map(i=>i.id);
 const DEFAULT_ICON='atom';
-const iconOf=id=>ICON_IDS.includes(id)?id:DEFAULT_ICON;           // unknown or missing id falls back to atom
-const iconById=id=>ICONS.find(i=>i.id===iconOf(id));
-const iconSVG=(id,size,o)=>{o=o||{};const ic=iconById(id);return '<span class="av'+(o.tile?' tile':'')+'" data-icon="'+ic.id+'" style="--s:'+size+'px"'+(o.label?' role="img" aria-label="'+o.label+'"':' aria-hidden="true"')+'>'+ic.svg+'</span>'};
+/* Pack icons (design/pack-odds.md). The 16 above are free and always in the picker. These 34 come only from packs,
+   in four bands (index = band). Gold chase: '{id}-gold' for all 50, drawn from the existing rare art in
+   img/icons/gold/ with a CSS gold ring and sheen. Art for the 34: img/icons/{id}.webp. */
+const BANDS=['Common','Uncommon','Rare','Epic'];
+const WIN_ICONS=[
+  ['boba','Boba',0],['camera','Camera',0],['cat','Cat',0],['dice','Dice',0],['dog','Dog',0],['donut','Donut',0],['pizza','Pizza',0],['note','Music Note',0],
+  ['sneaker','Sneaker',0],['headphones','Headphones',0],['soccer','Soccer Ball',0],['hoop','Hoop',0],['cactus','Cactus',0],['shades','Shades',0],['bulb','Light Bulb',0],['skateboard','Skateboard',0],
+  ['boombox','Boombox',1],['controller','Controller',1],['vinyl','Vinyl',1],['guitar','Guitar',1],['fox','Fox',1],['panda','Panda',1],['plane','Plane',1],['rainbow','Rainbow',1],['joystick','Joystick',1],['trophy','Trophy',1],
+  ['robot','Robot',2],['planet','Planet',2],['axolotl','Axolotl',2],['ufo','UFO',2],['volcano','Volcano',2],['chest','Treasure Chest',2],
+  ['dragon','Dragon',3],['dino','Dino',3]
+].map(([id,label,band])=>({id,label,band}));
+const WIN_IDS=WIN_ICONS.map(i=>i.id);
+const BASE_IDS=ICON_IDS.concat(WIN_IDS);
+const GOLD_IDS=BASE_IDS.map(id=>id+'-gold');
+const isGold=id=>typeof id==='string'&&id.slice(-5)==='-gold'&&BASE_IDS.includes(id.slice(0,-5));
+const baseOf=id=>isGold(id)?id.slice(0,-5):id;
+const iconKnown=id=>ICON_IDS.includes(id)||WIN_IDS.includes(id)||isGold(id);
+const iconOwned=id=>ICON_IDS.includes(id)||(Array.isArray(S.unlocked)&&S.unlocked.includes(id));
+const iconOf=id=>iconKnown(id)&&iconOwned(id)?id:DEFAULT_ICON;   // your own icon: free or unlocked, else atom
+const iconAny=id=>iconKnown(id)?id:DEFAULT_ICON;                   // anyone's icon (VS seats): any known id
+const iconLabel=id=>{id=iconAny(id);const b=baseOf(id),m=ICONS.find(i=>i.id===b)||WIN_ICONS.find(i=>i.id===b);return (isGold(id)?'Gold ':'')+m.label};
+const iconById=id=>({id:iconAny(id),label:iconLabel(id)});
+const iconSVG=(id,size,o)=>{o=o||{};id=iconAny(id);const b=baseOf(id),g=isGold(id),free=ICON_IDS.includes(b);
+  const art=g?'<img src="img/icons/gold/'+b+'.webp" alt="" draggable="false" decoding="async">':free?ICONS.find(i=>i.id===b).svg:'<img src="img/icons/'+b+'.webp" alt="" draggable="false" decoding="async">';
+  return '<span class="av'+(o.tile?' tile':'')+(g?' gold':'')+'" data-icon="'+id+'" style="--s:'+size+'px"'+(o.label?' role="img" aria-label="'+o.label+'"':' aria-hidden="true"')+'>'+art+'</span>'};
 
 /* ---------- save ---------- */
 const KEY='elemental-arcade-v1';
 const PKEY=KEY+'-prefs';
-const PROG=['owned','miss','xp','stars','rounds','best','vs','vsAt'];
+const PROG=['owned','miss','xp','stars','rounds','best','vs','vsAt','packs','finishes','finishOn','unlocked','packLog'];
+const PROG_ARR=['packs','unlocked','packLog'];   // list-shaped progress keys (the rest are maps or numbers)
 const VS0=()=>({w:0,l:0,streak:0,best:0,played:0});
 // icon: profile icon id; iconAt: when it was last picked on this device (ms), so the newer of device and account wins.
 /* Round length choices (solo here, VS via the match doc). 10 is the default and the only length older pages know. */
 const QNS=[10,15,20];
-const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,mute:false,deck:'s20',room:'mixed',qn:10,icon:DEFAULT_ICON,iconAt:0};
+// packs: unopened packs; finishes: cardId -> [finishId]; finishOn: cardId -> finish shown; unlocked: icon ids from
+// packs; packLog: pack ids already paid ('vs:CODE', 'gold:cardId') and opened ('open:' + id), so nothing pays twice.
+const S={owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,packs:[],finishes:{},finishOn:{},unlocked:[],packLog:[],mute:false,deck:'s20',room:'mixed',qn:10,icon:DEFAULT_ICON,iconAt:0};
 const readGuest=()=>{try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}return null};
 function loadGuest(){
-  Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,icon:DEFAULT_ICON,iconAt:0});
+  Object.assign(S,{owned:{},miss:{},xp:0,stars:{},rounds:0,best:0,vs:VS0(),vsAt:0,packs:[],finishes:{},finishOn:{},unlocked:[],packLog:[],icon:DEFAULT_ICON,iconAt:0});
   const g=readGuest();if(g)Object.assign(S,g);
+  fixProg();
   if(!DECKS.some(d=>d.id===S.deck))S.deck='s20';
   if(!ROOMS.some(r=>r.id===S.room))S.room='mixed';
   if(!QNS.includes(S.qn))S.qn=10;
@@ -495,7 +605,9 @@ function loadGuest(){
 }
 loadGuest();
 const progOf=()=>{const o={};PROG.forEach(k=>o[k]=S[k]);return o};
-const applyProg=p=>{p=p||{};PROG.forEach(k=>{S[k]=p[k]!=null?p[k]:(k==='vs'?VS0():typeof S[k]==='number'?0:{})})};
+const applyProg=p=>{p=p||{};PROG.forEach(k=>{S[k]=p[k]!=null?p[k]:(k==='vs'?VS0():PROG_ARR.includes(k)?[]:typeof S[k]==='number'?0:{})});fixProg()};
+// Older saves have no pack keys; a hand-edited one could have the wrong shape. Normalize both.
+function fixProg(){PROG_ARR.forEach(k=>{if(!Array.isArray(S[k]))S[k]=[]});['finishes','finishOn'].forEach(k=>{if(!S[k]||typeof S[k]!=='object'||Array.isArray(S[k]))S[k]={}})}
 const guestCount=()=>{const g=readGuest();return g&&g.owned?Object.keys(g.owned).length:0};
 let ACCT=null;          // {nick, cls} while signed in
 const acctKey=()=>ACCT?ACCT.cls+'_'+ACCT.nick:'';
@@ -629,7 +741,8 @@ function cardInner0(it,tier){
   '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1.5px solid '+c.dark+';border-radius:6px;background:'+(full?'rgba(255,255,255,.9)':c.tint)+'">'+lab(it.s1l,it.s1v,true)+lab(it.s2l,it.s2v)+lab(it.s3l,it.s3v)+'</div>'+
   '</div>'+(holo?'<div class="foil'+(gold?' gold':'')+'"></div><div class="spark"></div>':'')+'</div>';
 }
-const cardHTML=(it,s,tier,anim,cls)=>'<div class="cw'+(anim?' anim':'')+(cls?' '+cls:'')+'" style="--cs:'+s+'">'+cardInner(it,tier)+'</div>';
+// A card shows the finish its owner picked (S.finishOn) unless the caller passes its own fin-* class.
+const cardHTML=(it,s,tier,anim,cls)=>{const f=!(cls&&/fin-/.test(cls))&&S.finishOn&&S.finishOn[it.id];return '<div class="cw'+(anim?' anim':'')+(cls?' '+cls:'')+(FIN_IDS.includes(f)?' fin-'+f:'')+'" style="--cs:'+s+'">'+cardInner(it,tier)+'</div>'};
 let BACKCELLS=null;
 function backInner(){
   if(!BACKCELLS){
@@ -891,6 +1004,82 @@ function buildRound(deckId,roomId,seed,n){
 }
 window.buildRound=buildRound;window.mulberry32=mulberry32;
 
+/* ---------- packs (design/pack-odds.md) ----------
+   Earned only: 1st place in a VS match with at least 2 players who competed (one per match id), or a card's first
+   step to Gold Legend (one per card, ever). Three slots, rolled once when the pack is earned and stored on it, so a
+   refresh or another device never rerolls. Each slot's weights are percents and sum to 100. A pull never gives an
+   icon or finish the student already has (or has waiting in another pack): it falls to the next band down, then XP. */
+const FINISHES=[{id:'foil',label:'Foil'},{id:'holo',label:'Prism'},{id:'night',label:'Night Sky'},{id:'ember',label:'Ember'}];
+const FIN_IDS=FINISHES.map(f=>f.id);
+const PACK_ODDS=[
+  [['finish',60],['xp',40,15]],                                        // slot 1, the staple
+  [['b0',62],['b1',25],['b2',10],['b3',2],['gold',1]],                 // slot 2, the icon pull
+  [['xp',94,25],['b2',4],['b3',1],['gold',0.95],['feat',0.05]]         // slot 3, the chase
+];
+const FALL_XP=[15,20,25];                // what each slot pays when its pull is already owned
+const GOLD_AT=TIERS[TIERS.length-1].at;  // Gold Legend
+const WEEK0=Date.UTC(2026,0,5);          // a Monday: weeks for the featured gold start here
+const weekOf=ms=>Math.floor((ms-WEEK0)/604800000);
+const featuredGold=week=>GOLD_IDS[Math.floor(mulberry32((Math.imul(week+1,2654435761))>>>0)()*GOLD_IDS.length)];
+// Everything a new pull must not repeat: unlocked icons, finishes held, and whatever unopened packs already hold.
+function packHave(){
+  const icons=new Set(S.unlocked),fin=new Set();
+  Object.keys(S.finishes).forEach(c=>(S.finishes[c]||[]).forEach(f=>fin.add(c+'|'+f)));
+  S.packs.forEach(p=>(p.slots||[]).forEach(x=>{if(x.icon)icons.add(x.icon);if(x.finish)fin.add(x.card+'|'+x.finish)}));
+  let cards=Object.keys(S.owned).filter(id=>S.owned[id]>0&&BY[id]);
+  if(!cards.length)cards=deckItems('s20').map(it=>it.id);   // no cards yet: a finish waits on a Starter 20 card
+  return {icons,fin,cards};
+}
+// Pure given (seed, week, have): the same pack always rolls the same three slots.
+function rollPack(seed,week,have){
+  const rng=mulberry32(seed>>>0),take=list=>list[Math.floor(rng()*list.length)],out=[];
+  const band=b=>{for(;b>=0;b--){const c=WIN_ICONS.filter(i=>i.band===b&&!have.icons.has(i.id)).map(i=>i.id);if(c.length)return c}return null};
+  PACK_ODDS.forEach((tab,si)=>{
+    let r=rng()*100,row=tab[tab.length-1];
+    for(const t of tab){if(r<t[1]){row=t;break}r-=t[1]}
+    const src=row[0];let x=null;
+    if(src==='xp')x={kind:'xp',xp:row[2]};
+    else if(src==='finish'){const c=[];have.cards.forEach(id=>FIN_IDS.forEach(f=>{if(!have.fin.has(id+'|'+f))c.push(id+'|'+f)}));
+      if(c.length){const k=take(c),i=k.lastIndexOf('|');x={kind:'finish',card:k.slice(0,i),finish:k.slice(i+1)};have.fin.add(k)}}
+    else if(src[0]==='b'){const c=band(+src[1]);if(c){x={kind:'icon',icon:take(c)};have.icons.add(x.icon)}}
+    else if(src==='gold'){const c=GOLD_IDS.filter(g=>!have.icons.has(g));if(c.length){x={kind:'gold',icon:take(c)};have.icons.add(x.icon)}}
+    else if(src==='feat'){const g=featuredGold(week);if(!have.icons.has(g)){x={kind:'gold',icon:g,featured:true};have.icons.add(g)}}
+    if(!x)x={kind:'xp',xp:FALL_XP[si],fell:true};
+    x.src=src;out.push(x);
+  });
+  return out;
+}
+// reason 'vs' (ref = match code) or 'gold' (ref = card id). Returns false if that reason already paid.
+function earnPack(reason,ref){
+  const id=reason+':'+ref;
+  if(S.packLog.includes(id)||S.packs.some(p=>p.id===id))return false;
+  const at=Date.now(),seed=(Math.random()*4294967296)>>>0,week=weekOf(at);
+  const p={id,at,reason,seed,week,slots:rollPack(seed,week,packHave())};
+  if(reason==='vs')p.matchId=String(ref);else p.cardId=String(ref);
+  S.packs.push(p);S.packLog.push(id);save();
+  toast('Pack earned! Open it from your binder.');
+  const b=document.querySelector('[data-act="binder"]');if(b)b.outerHTML=binderBtnHTML();
+  return true;
+}
+// Add a pack's three rewards. Opened ids go into packLog, so another device's copy is dropped on merge.
+function applyPack(p){
+  p.slots.forEach(x=>{
+    if(x.kind==='xp')S.xp+=x.xp;
+    else if(x.kind==='finish'){const l=S.finishes[x.card]||(S.finishes[x.card]=[]);if(!l.includes(x.finish))l.push(x.finish);S.finishOn[x.card]=x.finish}
+    else if(S.unlocked.includes(x.icon))S.xp+=FALL_XP[2];   // unlocked meanwhile on another device: never a duplicate
+    else S.unlocked.push(x.icon);
+  });
+  S.packs=S.packs.filter(q=>q.id!==p.id);
+  if(!S.packLog.includes('open:'+p.id))S.packLog.push('open:'+p.id);
+  save();
+}
+let TOASTT=0;
+function toast(msg){
+  let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.appendChild(t)}
+  t.textContent=msg;t.classList.add('on');clearTimeout(TOASTT);TOASTT=setTimeout(()=>t.classList.remove('on'),3400);
+}
+
 /* ---------- state ---------- */
 const V={anim:'',fx:'',xpFrom:null,cardFrom:null,authTab:'in',authErr:'',authBusy:false,form:{cls:'',nick:'',pin:'',keep:false,bring:true},screen:'home',roomId:null,deckId:S.deck,qs:[],qi:0,pick:null,res:[],score:0,streak:0,best:0,newIds:[],missed:[],tab:'all',modal:null,flipped:{},lvBefore:1,lvAfter:1,ups:[],lastUp:-1,lastCount:0,xpGain:0,stars:0,perfect:false,lastPts:0,lastNew:false};
 const cur=()=>V.qs[V.qi];
@@ -929,6 +1118,7 @@ function answer(i){
     V.streak++;V.best=Math.max(V.best,V.streak);
     V.lastPts=10+Math.min(10,Math.max(0,V.streak-2)*2);V.score+=V.lastPts;
     const before=S.owned[q.item.id]||0;V.lastNew=!before;S.owned[q.item.id]=before+1;V.lastCount=before+1;
+    if(before<GOLD_AT&&before+1>=GOLD_AT)earnPack('gold',q.item.id);   // first step to Gold Legend: one pack per card, ever
     const t0=tierOf(before),t1=tierOf(before+1);V.lastUp=(t0>=0&&t1>t0)?t1:-1;
     {const bt=nextTier(before),bp=prevAt(before);V.cardFrom=V.lastUp>=0?0:(bt?Math.round((before-bp)/(bt.at-bp)*100):100)}
     V.fx=V.lastUp>=0?'level':'ok';
@@ -967,7 +1157,12 @@ function topHTML(){
   '<button class="sndbtn" data-act="mute" aria-pressed="'+!S.mute+'" aria-label="'+(S.mute?'Sound off':'Sound on')+'">'+SPK(!S.mute)+'</button></div>'+
   '<div class="trainer"><button class="icobtn" data-act="icons" aria-label="Change profile icon">'+iconSVG(S.icon,28)+'</button>'+
   '<div class="lvl"><span><b>Lv '+L.lvl+'</b>'+esc(L.title)+'</span><div class="xp" role="img" aria-label="'+L.into+' of '+L.need+' XP to next level"><i style="width:'+(V.xpFrom==null?Math.round(L.into/L.need*100):V.xpFrom)+'%" data-w="'+Math.round(L.into/L.need*100)+'"></i></div></div>'+
-  '<button class="iconbtn" data-act="binder" aria-label="Open card binder">Binder <b>'+have+'/'+ALL.length+'</b></button></div></header>';
+  binderBtnHTML()+'</div></header>';
+}
+// Binder button; a gold badge counts packs waiting to be opened.
+function binderBtnHTML(){
+  const have=ownedCount(ALL),n=S.packs.length;
+  return '<button class="iconbtn" data-act="binder" aria-label="Open card binder'+(n?', '+n+' pack'+(n>1?'s':'')+' to open':'')+'">Binder <b>'+have+'/'+ALL.length+'</b>'+(n?'<span class="pbadge" data-ui="pack-badge" aria-hidden="true">'+n+'</span>':'')+'</button>';
 }
 /* Guest notice: where progress lives. Only when sign-in exists on this copy; dismissed for the session. */
 let NOTICEOFF=false;try{NOTICEOFF=sessionStorage.getItem(KEY+'-notice')==='1'}catch(e){}
@@ -1072,15 +1267,40 @@ function binderHTML(){
     return '<div class="slot" '+ix+' aria-label="Locked card"><b>'+(it.cat==='el'?it.zn:'#'+it.id.replace(/\D/g,''))+'</b>'+lockSVG+'<span>LOCKED</span></div>';
   }).join('');
   const empty=have?'':'<div class="empty" data-ui="binder-empty"><p>Your binder is empty. Win a card by answering correctly in any room.</p><button class="btn" data-act="play">Play now</button></div>';
-  return '<div class="sechead"><div><h1 class="h">Card binder</h1><div class="bar" role="img" aria-label="'+have+' of '+ALL.length+' cards"><i style="width:'+Math.round(have/ALL.length*100)+'%"></i></div><p class="sub">'+have+' of '+ALL.length+' cards collected. Tap a card to enlarge it.</p></div><button class="btn ghost small" data-act="home">Back to rooms</button></div>'+
+  return packsHTML()+'<div class="sechead"><div><h1 class="h">Card binder</h1><div class="bar" role="img" aria-label="'+have+' of '+ALL.length+' cards"><i style="width:'+Math.round(have/ALL.length*100)+'%"></i></div><p class="sub">'+have+' of '+ALL.length+' cards collected. Tap a card to enlarge it.</p></div><button class="btn ghost small" data-act="home">Back to rooms</button></div>'+
   empty+'<div class="tabs" role="tablist" style="margin-bottom:18px">'+tabHTML+'</div><div class="grid">'+cells+'</div>';
+}
+/* Binder top: unopened packs, then the odds in plain numbers (straight from PACK_ODDS, so they cannot drift). */
+const packWhy=p=>p.reason==='vs'?'VS win':'Gold Legend: '+((BY[p.cardId]||{}).name||'a card');
+const packArt=sz=>'<span class="pkart '+sz+'" aria-hidden="true"><span class="pkfoil"></span><span class="pklogo">'+atomLogo+'</span><span class="pkname">ELEMENTAL<br>PACK</span><span class="pkcrimp t"></span><span class="pkcrimp b"></span></span>';
+function packsHTML(){
+  const n=S.packs.length;
+  const list=n?'<div class="packrow">'+S.packs.map(p=>'<button class="minipack" data-act="pack-open" data-id="'+esc(p.id)+'">'+packArt('sm')+'<span>'+esc(packWhy(p))+'<b>Open</b></span></button>').join('')+'</div>':'';
+  return '<section class="packs" data-ui="packs">'+(n?'<h2 class="h">Packs to open <em>'+n+'</em></h2>'+list:'')+oddsHTML()+'</section>';
+}
+const pct=v=>(v<1?String(v):String(v))+'%';
+const bandNames=b=>WIN_ICONS.filter(i=>i.band===b).map(i=>i.label).join(', ');
+function oddsHTML(){
+  const fg=featuredGold(weekOf(Date.now()));
+  const row=(w,t)=>'<tr><td class="r">'+pct(w)+'</td><td>'+t+'</td></tr>';
+  const [s1,s2,s3]=PACK_ODDS;
+  const lab={finish:'A special finish on one of your cards (Foil, Prism, Night Sky or Ember)',b0:'A Common icon',b1:'An Uncommon icon',b2:'A Rare icon',b3:'An Epic icon',gold:'A gold icon (any of the 50, picked evenly)',feat:"This week's gold: "+iconLabel(fg)};
+  const t=(tab)=>tab.map(r=>row(r[1],r[0]==='xp'?'+'+r[2]+' XP':lab[r[0]])).join('');
+  return '<details class="panel odds" data-ui="pack-odds"><summary>Pack odds: what is inside</summary>'+
+  '<p class="sub">Packs are earned, never bought. Win a VS Arena match (1st place, at least 2 players) or take a card to Gold Legend. Each pack has 3 cards, rolled when you earn it.</p>'+
+  '<div class="oddsgrid"><table class="vs-tbl"><caption>Card 1: the staple</caption>'+t(s1)+'</table><table class="vs-tbl"><caption>Card 2: the icon pull</caption>'+t(s2)+'</table><table class="vs-tbl"><caption>Card 3: the chase</caption>'+t(s3)+'</table></div>'+
+  '<p class="feat" data-ui="weekly-gold">'+iconSVG(fg,40)+'<span><b>This week\'s gold: '+esc(iconLabel(fg))+'</b> 0.05% in card 3. It changes every Monday.</span></p>'+
+  '<p class="sub"><b>Common (16):</b> '+bandNames(0)+'.<br><b>Uncommon (10):</b> '+bandNames(1)+'.<br><b>Rare (6):</b> '+bandNames(2)+'.<br><b>Epic (2):</b> '+bandNames(3)+'.</p>'+
+  '<p class="sub">You never get an icon or finish you already have. If every icon in a band is yours, the pull drops to the next band down, then to XP. The 16 starter icons are always free.</p></details>';
 }
 function modalHTML(){
   const it=BY[V.modal];if(!it)return '';
   const s=Math.max(.6,Math.min(1.5,(innerWidth-40)/240,(innerHeight-150)/336));
   const n=S.owned[it.id]||0,t=tierShown(it.id),nt=nextTier(n);
   const info=n?TIERS[t].n+' · answered correctly '+n+' time'+(n>1?'s':'')+(nt?'. '+(nt.at-n)+' more to reach '+nt.n+'.':'. Max level!'):'Not collected yet';
-  return '<div class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-label="'+esc(it.name)+' card"><div data-stop="1">'+cardHTML(it,s,t,true)+'</div><div class="meta">'+info+'</div><button class="btn small" data-act="closemodal">Close</button></div>';
+  const fl=S.finishes[it.id]||[],on=S.finishOn[it.id]||'';
+  const fins=fl.length?'<div class="finrow" role="group" aria-label="Card finish">'+[''].concat(fl).map(f=>'<button class="btn ghost small" data-act="finish" data-id="'+f+'" aria-pressed="'+(f===on)+'">'+(f?FINISHES.find(x=>x.id===f).label:'No finish')+'</button>').join('')+'</div>':'';
+  return '<div class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-label="'+esc(it.name)+' card"><div data-stop="1">'+cardHTML(it,s,t,true)+'</div><div class="meta">'+info+'</div>'+fins+'<button class="btn small" data-act="closemodal">Close</button></div>';
 }
 const SYNCTXT={saving:'Saving…',saved:'Saved to your account',offline:'Could not reach the server. Your progress will save when you are back online.'};
 const acctIconHTML=()=>'<div class="acctav" data-ui="account-icon">'+iconSVG(S.icon,64)+'<div><b>'+iconById(S.icon).label+'</b><button class="btn ghost small" data-act="icons" style="margin-top:6px">Change icon</button></div></div>';
@@ -1109,14 +1329,17 @@ function accountHTML(){
 /* Icon picker. The grid markup is shared with the VS join screen (vs.js passes its own data-vs attribute). */
 function iconGridHTML(sel,attr){
   sel=iconOf(sel);
-  return '<div class="icongrid" role="radiogroup" aria-label="Profile icon">'+ICONS.map(ic=>{const on=ic.id===sel;
-    return '<button type="button" class="icell" role="radio" aria-checked="'+on+'" tabindex="'+(on?0:-1)+'" '+attr+' data-id="'+ic.id+'" aria-label="'+ic.label+'">'+iconSVG(ic.id,64)+'<small aria-hidden="true">'+ic.label+'</small></button>'}).join('')+'</div>';
+  // The 16 free icons, then pack icons and gold icons this student has unlocked (in band order).
+  const ids=ICON_IDS.concat(WIN_IDS.filter(id=>S.unlocked.includes(id)),GOLD_IDS.filter(id=>S.unlocked.includes(id)));
+  return '<div class="icongrid" role="radiogroup" aria-label="Profile icon">'+ids.map(id=>{const on=id===sel,lb=iconLabel(id);
+    return '<button type="button" class="icell" role="radio" aria-checked="'+on+'" tabindex="'+(on?0:-1)+'" '+attr+' data-id="'+id+'" aria-label="'+lb+'">'+iconSVG(id,64)+'<small aria-hidden="true">'+lb+'</small></button>'}).join('')+'</div>';
 }
 function iconsHTML(){
   const sel=iconOf(V.iconSel),ic=iconById(sel);
   return '<section class="panel auth picker" data-ui="picker"><div class="qmeta">Profile icon</div><h1 class="prompt">Pick your icon</h1>'+
   '<div class="pickprev">'+iconSVG(sel,64)+'<div><b data-ui="pick-label">'+ic.label+'</b><span>'+(ACCT?esc(ACCT.nick):'Guest')+'</span></div></div>'+
-  iconGridHTML(sel,'data-act="icon-pick"')+'</section>'+
+  iconGridHTML(sel,'data-act="icon-pick"')+
+  '<p class="sub" data-ui="pack-tease">'+(WIN_IDS.length-WIN_IDS.filter(id=>S.unlocked.includes(id)).length)+' more icons and '+GOLD_IDS.filter(id=>!S.unlocked.includes(id)).length+' gold icons can come from packs. Odds are in your binder.</p></section>'+
   '<div class="stickybar picker" data-ui="picker-bar"><button class="btn ghost" data-act="icon-cancel">Cancel</button><button class="btn" data-act="icon-use"'+(sel===S.icon?' disabled':'')+'>Use this</button></div>';
 }
 function render(){
@@ -1176,6 +1399,111 @@ function doFx(kind){
   else if(kind==='perfect'){burst(innerWidth/2,Math.min(200,innerHeight/3),64,300,cols.concat(['#ff5ab4','#47ffbe']))}
 }
 
+
+/* ---------- pack opening ----------
+   A foil pack in the middle of the screen. Drag across its top edge (or swipe up) past a threshold to tear it; on a
+   computer the same drag works, a click on the pack tears it, and the "Tear open" button is always there. Then three
+   cards deal face down; tap or flick each to flip it. Anything that is not XP gets a longer glow. Reduced motion:
+   no tear, the button says "Open" and the three results appear face up. Nothing is applied until "Add to binder". */
+let PK=null;   // {id, open, flipped:[bool x3]}
+const packRoot=()=>{let r=document.getElementById('pack-root');if(!r){r=document.createElement('div');r.id='pack-root';document.body.appendChild(r)}return r};
+const slotSpecial=x=>x.kind!=='xp';
+function slotText(x){
+  if(x.kind==='xp')return '+'+x.xp+' XP';
+  if(x.kind==='finish')return FINISHES.find(f=>f.id===x.finish).label+' finish for '+((BY[x.card]||{}).name||'a card');
+  if(x.kind==='gold')return iconLabel(x.icon)+(x.featured?", this week's gold":', gold icon');
+  return iconLabel(x.icon)+', '+BANDS[WIN_ICONS.find(i=>i.id===x.icon).band]+' icon';
+}
+function slotFace(x){
+  if(x.kind==='xp')return '<span class="pkxp">+'+x.xp+'<small>XP</small></span><b>XP burst</b>';
+  if(x.kind==='finish'){const it=BY[x.card];return (it?cardHTML(it,.3,tierShown(it.id),false,'fin-'+x.finish):'')+'<b>'+FINISHES.find(f=>f.id===x.finish).label+'</b><small>'+esc(it?it.name:'')+'</small>'}
+  if(x.kind==='gold')return iconSVG(x.icon,64)+'<b>'+esc(iconLabel(x.icon))+'</b><small>'+(x.featured?"This week's gold!":'Gold icon')+'</small>';
+  return iconSVG(x.icon,64)+'<b>'+esc(iconLabel(x.icon))+'</b><small>'+BANDS[WIN_ICONS.find(i=>i.id===x.icon).band]+' icon</small>';
+}
+function packSceneHTML(p){
+  const rm=RM.matches,all=PK.flipped.every(Boolean);
+  const cards=p.slots.map((x,i)=>{const up=PK.flipped[i];
+    return '<button class="pkcard'+(up?' up':'')+(slotSpecial(x)?' special':'')+'" data-pk="flip" data-i="'+i+'" style="--d:'+i+'" aria-label="'+(up?esc(slotText(x)):'Card '+(i+1)+', face down. Tap to flip.')+'">'+
+      '<span class="pkin"><span class="pkback">'+packArt('card')+'</span><span class="pkface">'+slotFace(x)+'</span></span></button>'}).join('');
+  return '<div class="pkscene'+(PK.open?' open':'')+'" role="dialog" aria-modal="true" aria-label="Open your pack" data-ui="pack-scene">'+
+    '<button class="xbtn pkclose" data-pk="close" aria-label="Close, keep the pack for later">×</button>'+
+    '<p class="pkwhy">'+esc(packWhy(p))+'</p>'+
+    (PK.open
+      ?'<div class="pkcards" data-ui="pack-cards">'+cards+'</div><p class="pkhint" data-ui="pack-hint" aria-live="polite">'+(all?'All three flipped.':'Tap each card to flip it.')+'</p>'+
+        '<button class="btn" data-pk="done"'+(all?'':' hidden')+'>Add to binder</button>'
+      :'<div class="pack" data-pk="pack">'+packArt('lg')+'<span class="pkstrip" aria-hidden="true"></span></div>'+
+        (rm?'':'<p class="pkhint">Swipe across the top of the pack to tear it open.</p>')+
+        '<button class="btn" data-pk="tear">'+(rm?'Open':'Tear open')+'</button>')+
+    '</div>';
+}
+function openPack(id){
+  const p=S.packs.find(x=>x.id===id);if(!p)return;
+  PK={id,open:false,flipped:[false,false,false]};
+  drawPack();
+  const b=packRoot().querySelector('[data-pk="tear"]');if(b)b.focus({preventScroll:true});
+}
+function drawPack(){const p=PK&&S.packs.find(x=>x.id===PK.id);const r=packRoot();if(!p){r.innerHTML='';return}r.innerHTML=packSceneHTML(p);document.body.classList.add('pkopen')}
+function closePack(){PK=null;packRoot().innerHTML='';document.body.classList.remove('pkopen');const b=document.querySelector('[data-act="binder"]');if(b)b.outerHTML=binderBtnHTML()}
+function tearPack(){
+  if(!PK||PK.open)return;
+  const done=()=>{if(!PK)return;PK.open=true;if(RM.matches)PK.flipped=[true,true,true];drawPack();const f=packRoot().querySelector(RM.matches?'[data-pk="done"]':'[data-pk="flip"]');if(f)f.focus({preventScroll:true})};
+  if(RM.matches){done();return}
+  try{if(navigator.vibrate)navigator.vibrate(30)}catch(e){}
+  tone('level');
+  const pk=packRoot().querySelector('.pack');if(pk)pk.classList.add('torn');
+  setTimeout(done,520);
+}
+function flipCard(i){
+  if(!PK||!PK.open||PK.flipped[i])return;
+  const p=S.packs.find(x=>x.id===PK.id);if(!p)return;
+  PK.flipped[i]=true;const x=p.slots[i];
+  const el=packRoot().querySelector('[data-pk="flip"][data-i="'+i+'"]');
+  if(el){el.classList.add('up');el.setAttribute('aria-label',slotText(x))}
+  tone(slotSpecial(x)?'level':'flip');
+  if(PK.flipped.every(Boolean)){
+    const h=packRoot().querySelector('[data-ui="pack-hint"]');if(h)h.textContent='All three flipped.';
+    const d=packRoot().querySelector('[data-pk="done"]');if(d){d.hidden=false;d.focus({preventScroll:true})}
+  }
+}
+function finishPack(){
+  const p=PK&&S.packs.find(x=>x.id===PK.id);if(!p)return;
+  const icons=p.slots.filter(x=>x.icon).length;
+  applyPack(p);closePack();V.anim='';render();
+  toast(icons?'Added. Your new icon is in the icon picker.':'Added to your binder.');
+}
+// Pointer: a drag across the pack's top edge (or a swipe up) tears it; a plain click tears it on a mouse or trackpad.
+// A flick on a dealt card flips it (a tap is a click, handled below).
+let PDRAG=null;
+const FINE=window.matchMedia?matchMedia('(pointer: fine)'):{matches:false};
+document.addEventListener('pointerdown',e=>{
+  if(!PK)return;
+  const pk=e.target.closest&&e.target.closest('[data-pk="pack"]'),cd=e.target.closest&&e.target.closest('[data-pk="flip"]');
+  if(pk&&!PK.open){const r=pk.getBoundingClientRect();PDRAG={kind:'pack',x:e.clientX,y:e.clientY,w:r.width,top:e.clientY-r.top<r.height*.4,moved:0,el:pk};try{pk.setPointerCapture(e.pointerId)}catch(x){}}
+  else if(cd)PDRAG={kind:'card',x:e.clientX,y:e.clientY,i:+cd.dataset.i,moved:0};
+});
+document.addEventListener('pointermove',e=>{
+  if(!PDRAG||PDRAG.kind!=='pack')return;
+  const dx=e.clientX-PDRAG.x,dy=e.clientY-PDRAG.y;PDRAG.moved=Math.max(PDRAG.moved,Math.hypot(dx,dy));
+  const st=PDRAG.el.querySelector('.pkstrip');
+  if(st&&PDRAG.top&&!RM.matches)st.style.transform='translateX('+dx.toFixed(0)+'px) rotate('+(dx/20).toFixed(1)+'deg)';
+  if((PDRAG.top&&Math.abs(dx)>PDRAG.w*.55)||dy<-90){PDRAG=null;tearPack()}
+});
+document.addEventListener('pointerup',e=>{
+  const d=PDRAG;PDRAG=null;if(!d||!PK)return;
+  if(d.kind==='pack'){const st=d.el.querySelector('.pkstrip');if(st)st.style.transform='';if(d.moved<8&&FINE.matches)tearPack()}
+  else if(d.kind==='card'&&Math.hypot(e.clientX-d.x,e.clientY-d.y)>24)flipCard(d.i);
+});
+document.addEventListener('pointercancel',()=>{if(PDRAG&&PDRAG.el){const st=PDRAG.el.querySelector('.pkstrip');if(st)st.style.transform=''}PDRAG=null});
+document.addEventListener('click',e=>{
+  if(!PK)return;const t=e.target.closest&&e.target.closest('[data-pk]');if(!t)return;
+  const k=t.dataset.pk;
+  if(k==='tear')tearPack();
+  else if(k==='flip')flipCard(+t.dataset.i);
+  else if(k==='done')finishPack();
+  else if(k==='close')closePack();
+});
+document.addEventListener('keydown',e=>{if(PK&&e.key==='Escape')closePack()});
+
 /* ---------- events ---------- */
 const app=document.getElementById('app'),mroot=document.getElementById('modal-root');
 const onClick=e=>{
@@ -1210,6 +1538,8 @@ const onClick=e=>{
   else if(a==='mute'){S.mute=!S.mute;save();render()}
   else if(a==='again'){const r=roomOf(V.roomId);if(r&&!roomN(r,S.deck)){V.roomMsg=lockedMsg(r);V.anim='screen';V.screen='home';V.modal=null;render();window.scrollTo(0,0)}else startRound(V.roomId)}   // a Review round can clear its own pool
   else if(a==='open'){V.modal=id;renderModal()}
+  else if(a==='finish'){if(FIN_IDS.includes(id))S.finishOn[V.modal]=id;else delete S.finishOn[V.modal];save();render();renderModal(true)}
+  else if(a==='pack-open')openPack(id);
   else if(a==='flip'){V.flipped[id]=!V.flipped[id];tone('flip');t.classList.toggle('on',!!V.flipped[id])}
   else if(a==='flipall'){V.newIds.forEach(i=>V.flipped[i]=true);tone('flip');app.querySelectorAll('.flip').forEach(b=>b.classList.add('on'))}
 };
@@ -1272,8 +1602,8 @@ function wireCloud(){
       let mine=null;
       try{const p=JSON.parse(localStorage.getItem(PKEY)||'null');if(p){if(typeof p.mute==='boolean')S.mute=p.mute;if(DECKS.some(d=>d.id===p.deck))S.deck=p.deck;if(ROOMS.some(r=>r.id===p.room))S.room=p.room;if(QNS.includes(p.qn))S.qn=p.qn;if(p.iconFor===acctKey())mine=p}}catch(e){}
       const m=meta||{},local=mine&&+mine.iconAt>(+m.updated||0);
+      applyProg(prog);   // first: the icon below may be one this account unlocked from a pack
       S.icon=iconOf(local?mine.icon:m.icon);S.iconAt=local?+mine.iconAt:0;
-      applyProg(prog);
       if(local)save();
       if(V.screen==='account'||V.screen==='quiz'||V.screen==='results')V.screen='home';
       V.modal=null;render();
@@ -1310,13 +1640,14 @@ addEventListener('resize',()=>{mclr();clearTimeout(rz);rz=setTimeout(()=>{
 window.Arcade={QNS,S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
   ICONS,ICON_IDS,iconOf,iconSVG,iconGridHTML,setIcon,getIcon:()=>S.icon,
+  WIN_ICONS,GOLD_IDS,PACK_ODDS,FINISHES,GOLD_AT,earnPack,rollPack,packHave,applyPack,featuredGold,weekOf,openPack:id=>openPack(id),
   goto:scr=>{V.anim='screen';V.screen=scr;V.authErr='';V.modal=null;render();window.scrollTo(0,0)},
   burst:(x,y,n,spread,cols)=>{if(!RM.matches)burst(x,y,n,spread,cols||['#f3dd7a','#7fd1f0','#f2a8a3','#fdf6d8','#4caf62'])}};
 render();
 </script>
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
-<script type="module" src="cloud.js?v=4"></script>
-<script type="module" src="vs.js?v=8"></script>
+<script type="module" src="cloud.js?v=5"></script>
+<script type="module" src="vs.js?v=9"></script>
 </body>
 </html>

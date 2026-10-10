@@ -27,7 +27,8 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const email = (c, n) => `${c}_${n}@players.elemental-arcade.example`;
   const pass = (pin, c) => `${pin}-${c}-elemental`;
-  const EMPTY = { owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: { w: 0, l: 0, streak: 0, best: 0, played: 0 }, vsAt: 0 };
+  const EMPTY = { owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: { w: 0, l: 0, streak: 0, best: 0, played: 0 }, vsAt: 0,
+    packs: [], finishes: {}, finishOn: {}, unlocked: [], packLog: [] };
   const maxObj = (a, b) => { const o = Object.assign({}, a); for (const k in b) o[k] = Math.max(o[k] || 0, b[k] || 0); return o; };
   // VS record: w, l, played and best take the larger side. The streak is not a count, so it comes from
   // whichever side finished a VS match most recently (larger vsAt). Never summed.
@@ -37,7 +38,26 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
     const newer = (b.vsAt || 0) > (a.vsAt || 0) ? b : a;
     return { w: mx('w'), l: mx('l'), streak: (newer.vs && newer.vs.streak) || 0, best: mx('best'), played: mx('played') };
   };
-  const merge = (a, b) => ({
+  // Packs: unlocks, finishes and packLog are unions (nothing earned is ever lost). Unopened packs are the union by id,
+  // minus any pack either side has opened ('open:' + id in packLog), so an opened pack never comes back. The shown
+  // finish prefers this device (b).
+  const uni = (a, b) => Array.from(new Set([].concat(Array.isArray(a) ? a : [], Array.isArray(b) ? b : [])));
+  const mergeFin = (a, b) => { const o = {}; [a, b].forEach(m => { if (m && typeof m === 'object') for (const k in m) o[k] = uni(o[k], m[k]); }); return o; };
+  const mergePacks = (a, b, log) => {
+    const out = [], seen = new Set();
+    [].concat(Array.isArray(a.packs) ? a.packs : [], Array.isArray(b.packs) ? b.packs : []).forEach(p => {
+      if (p && p.id && !seen.has(p.id) && !log.includes('open:' + p.id)) { seen.add(p.id); out.push(p); }
+    });
+    return out;
+  };
+  const merge = (a, b) => {
+    const packLog = uni(a.packLog, b.packLog);
+    return Object.assign(merge0(a, b), {
+      packs: mergePacks(a, b, packLog), finishes: mergeFin(a.finishes, b.finishes),
+      finishOn: Object.assign({}, a.finishOn || {}, b.finishOn || {}), unlocked: uni(a.unlocked, b.unlocked), packLog
+    });
+  };
+  const merge0 = (a, b) => ({
     owned: maxObj(a.owned, b.owned), miss: maxObj(a.miss, b.miss), stars: maxObj(a.stars, b.stars),
     xp: Math.max(a.xp || 0, b.xp || 0), rounds: Math.max(a.rounds || 0, b.rounds || 0), best: Math.max(a.best || 0, b.best || 0),
     vs: mergeVs(a, b), vsAt: Math.max(a.vsAt || 0, b.vsAt || 0)

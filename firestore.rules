@@ -35,10 +35,31 @@ service cloud.firestore {
 
     function codeOk(code) { return code.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$'); }
 
-    // Profile icons are preset ids (the 16 in index.html ICONS), never markup. Optional on every doc that has one.
+    // Profile icons are ids, never markup (index.html ICONS, WIN_ICONS, GOLD_IDS). The 16 free ones anyone may use.
+    // The 34 pack icons and the 50 '{id}-gold' icons only after unlocking them from a pack (progress.unlocked).
+    function freeIcons() { return ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask',
+                            'crown', 'shield', 'spark', 'wave']; }
+    function packIcons() { return ['boba', 'camera', 'cat', 'dice', 'dog', 'donut', 'pizza', 'note', 'sneaker', 'headphones', 'soccer', 'hoop',
+                            'cactus', 'shades', 'bulb', 'skateboard', 'boombox', 'controller', 'vinyl', 'guitar', 'fox', 'panda', 'plane',
+                            'rainbow', 'joystick', 'trophy', 'robot', 'planet', 'axolotl', 'ufo', 'volcano', 'chest', 'dragon', 'dino',
+                            'atom-gold', 'bolt-gold', 'beaker-gold', 'crystal-gold', 'flame-gold', 'droplet-gold', 'magnet-gold', 'moon-gold',
+                            'star-gold', 'comet-gold', 'rocket-gold', 'flask-gold', 'crown-gold', 'shield-gold', 'spark-gold', 'wave-gold',
+                            'boba-gold', 'camera-gold', 'cat-gold', 'dice-gold', 'dog-gold', 'donut-gold', 'pizza-gold', 'note-gold',
+                            'sneaker-gold', 'headphones-gold', 'soccer-gold', 'hoop-gold', 'cactus-gold', 'shades-gold', 'bulb-gold',
+                            'skateboard-gold', 'boombox-gold', 'controller-gold', 'vinyl-gold', 'guitar-gold', 'fox-gold', 'panda-gold',
+                            'plane-gold', 'rainbow-gold', 'joystick-gold', 'trophy-gold', 'robot-gold', 'planet-gold', 'axolotl-gold',
+                            'ufo-gold', 'volcano-gold', 'chest-gold', 'dragon-gold', 'dino-gold']; }
+    // /players doc: free, or unlocked in this same doc's progress.
     function iconOk(d) {
-      return !('icon' in d) || d.icon in ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon',
-                                          'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
+      return !('icon' in d) || d.icon in freeIcons()
+        || ('progress' in d && d.progress.get('unlocked', []) is list && d.icon in d.progress.get('unlocked', []));
+    }
+    // Match seat: free; an account's unlocked icon (read from their /players doc); a guest's pack icon (a guest's
+    // unlocks live only on their device, so the rules cannot check them: any pack icon id is accepted).
+    function seatIconOk(d, uid) {
+      return !('icon' in d) || d.icon in freeIcons()
+        || (isAnon() && d.icon in packIcons())
+        || (!isAnon() && exists(playerDoc(uid)) && d.icon in get(playerDoc(uid)).data.get('progress', {}).get('unlocked', []));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -51,7 +72,18 @@ service cloud.firestore {
       allow create, update: if isAccount() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['progress', 'nick', 'cls', 'icon', 'updated'])
         && iconOk(request.resource.data)
-        && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt'])
+        && request.resource.data.progress.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt',
+             'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'])
+        // Packs (index.html "packs"): unlocked icons must be pack icon ids; finishes are maps; the shown finish
+        // per card is one of the four finish ids. Packs and packLog are lists (contents are rolled client-side).
+        && (!('unlocked' in request.resource.data.progress)
+            || (request.resource.data.progress.unlocked is list && request.resource.data.progress.unlocked.hasOnly(packIcons())))
+        && (!('packs' in request.resource.data.progress) || (request.resource.data.progress.packs is list && request.resource.data.progress.packs.size() <= 200))
+        && (!('packLog' in request.resource.data.progress) || request.resource.data.progress.packLog is list)
+        && (!('finishes' in request.resource.data.progress) || request.resource.data.progress.finishes is map)
+        && (!('finishOn' in request.resource.data.progress)
+            || (request.resource.data.progress.finishOn is map
+                && request.resource.data.progress.finishOn.values().hasOnly(['foil', 'holo', 'night', 'ember'])))
         && (!('vs' in request.resource.data.progress)
             || (request.resource.data.progress.vs is map
                 && request.resource.data.progress.vs.keys().hasOnly(['w', 'l', 'streak', 'best', 'played'])))
@@ -236,7 +268,7 @@ service cloud.firestore {
           && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
                'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
-          && iconOk(request.resource.data)
+          && seatIconOk(request.resource.data, uid)
           && request.resource.data.keys().hasAll(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
                'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak'])
           && request.resource.data.guest == isAnon()
@@ -277,7 +309,7 @@ service cloud.firestore {
             && request.auth.uid == uid
             && request.resource.data.keys().hasOnly(['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs',
                  'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
-            && iconOk(request.resource.data)
+            && seatIconOk(request.resource.data, uid)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'score', 'correct', 'totalMs',
                  'answeredQ', 'reaction', 'reactionAt', 'abandoned', 'left', 'streak', 'icon'])
             && request.resource.data.answeredQ >= resource.data.answeredQ

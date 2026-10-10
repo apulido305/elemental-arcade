@@ -19,7 +19,10 @@ export const DECK_IDS = ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'is
 export const ROOM_IDS = ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed'];
 export const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
 // Profile icon ids (index.html ICONS). Optional on /players and on seats; anything else is rejected.
-export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];
+export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];   // free
+export const WIN_ICON_IDS = ['boba', 'camera', 'cat', 'dice', 'dog', 'donut', 'pizza', 'note', 'sneaker', 'headphones', 'soccer', 'hoop', 'cactus', 'shades', 'bulb', 'skateboard', 'boombox', 'controller', 'vinyl', 'guitar', 'fox', 'panda', 'plane', 'rainbow', 'joystick', 'trophy', 'robot', 'planet', 'axolotl', 'ufo', 'volcano', 'chest', 'dragon', 'dino'];
+export const PACK_ICON_IDS = WIN_ICON_IDS.concat(ICON_IDS.concat(WIN_ICON_IDS).map(i => i + '-gold'));   // winnable + gold
+const FINISH_IDS = ['foil', 'holo', 'night', 'ember'];
 const MAX_CAP = 20, MIN_CAP = 2, MIN = 60 * 1000;
 
 export const MATCH_KEYS = ['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests', 'listed', 'status',
@@ -30,7 +33,7 @@ export const PLAYER_KEYS = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'c
 const SEAT_KEYS = PLAYER_KEYS.concat(['icon']);     // icon is optional: hasOnly allows it, hasAll does not require it
 const PLAYER_REQUIRED = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'abandoned', 'left'];
 export const ANSWER_KEYS = ['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'];
-const PROGRESS_KEYS = ['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt'];
+const PROGRESS_KEYS = ['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'];
 const TOP_PLAYER_KEYS = ['progress', 'nick', 'cls', 'icon', 'updated'];
 
 // ---- tiny helpers (the Firestore-rules vocabulary) ----
@@ -46,7 +49,11 @@ const hasOnly = (o, allowed) => isObj(o) && keys(o).every(k => allowed.includes(
 const hasAll = (o, req) => isObj(o) && req.every(k => k in o);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const subset = (arr, allowed) => arr.every(k => allowed.includes(k));
-const iconOk = d => !('icon' in d) || ICON_IDS.includes(d.icon);
+// /players doc: free icon, or one unlocked in this doc's progress.unlocked.
+const iconOk = d => !('icon' in d) || ICON_IDS.includes(d.icon) || (isObj(d.progress) && Array.isArray(d.progress.unlocked) && d.progress.unlocked.includes(d.icon));
+// Seat: free; an account's unlocked icon (from their /players doc); a guest: any pack icon id.
+const seatIconOk = (c, d) => !('icon' in d) || ICON_IDS.includes(d.icon) || (c.anon ? PACK_ICON_IDS.includes(d.icon)
+  : (() => { const p = c.get('players/' + c.uid); return !!p && isObj(p.progress) && Array.isArray(p.progress.unlocked) && p.progress.unlocked.includes(d.icon); })());
 const validCode = s => isStr(s) && s.length === 6 && [...s].every(ch => CODE_ALPHABET.includes(ch));
 
 const alt = (name, ...clauses) => ({ name, clauses });
@@ -166,7 +173,7 @@ const SEAT_MUTABLE = ['lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'r
 const seatCreate = [
   signedIn, ['pid == uid', c => c.params.pid === c.uid],
   ['exactly the 13 seat keys (icon optional)', c => hasOnly(c.inc, SEAT_KEYS) && hasAll(c.inc, PLAYER_KEYS)],
-  ['icon (if present) is a preset id', c => iconOk(c.inc)],
+  ['icon (if present): free, unlocked by this account, or (guest) any pack icon', c => seatIconOk(c, c.inc)],
   ['guest == (provider is anonymous)', c => c.inc.guest === c.anon],
   ['joinedAt == request.time', c => ms(c.inc.joinedAt) === c.time],
   ['score, correct, totalMs, streak 0; answeredQ -1', c => c.inc.score === 0 && c.inc.correct === 0 && c.inc.totalMs === 0 && c.inc.answeredQ === -1 && c.inc.streak === 0],
@@ -188,7 +195,7 @@ const seatCreateJoin = alt('join an open lobby',
 const seatUpdateSelf = alt('update own seat',
   signedIn, ['pid == uid', c => c.params.pid === c.uid],
   ['seat keys only', c => hasOnly(c.inc, SEAT_KEYS)],
-  ['icon (if present) is a preset id', c => iconOk(c.inc)],
+  ['icon (if present): free, unlocked by this account, or (guest) any pack icon', c => seatIconOk(c, c.inc)],
   ['only lastSeen, score, correct, totalMs, answeredQ, reaction, reactionAt, abandoned, left, streak, icon change (nick, guest, joinedAt fixed)', c => subset(c.changed, SEAT_MUTABLE)],
   ['answeredQ never decreases and is <= qn - 1', c => c.inc.answeredQ >= c.res.answeredQ && c.inc.answeredQ <= matchQn(c) - 1],
   ['an abandoned player stays abandoned', c => !(c.res.abandoned === true && c.inc.abandoned !== true)],
@@ -238,10 +245,13 @@ const presenceWrite = [
 const playersOwn = [signedIn, notAnon, ['uid == auth.uid', c => c.params.uid === c.uid]];
 const playersWrite = playersOwn.concat([
   ['keys hasOnly progress, nick, cls, icon, updated', c => hasOnly(c.inc, TOP_PLAYER_KEYS)],
-  ['icon (if present) is a preset id', c => iconOk(c.inc)],
+  ['icon (if present): free, or unlocked in this doc (progress.unlocked)', c => iconOk(c.inc)],
   ['progress is a map with whitelisted keys', c => isObj(c.inc.progress) && hasOnly(c.inc.progress, PROGRESS_KEYS)],
   ['progress.vs (if present) is a map with keys w, l, streak, best, played', c => !('vs' in c.inc.progress) || (isObj(c.inc.progress.vs) && hasOnly(c.inc.progress.vs, ['w', 'l', 'streak', 'best', 'played']))],
-  ['progress.vsAt (if present) is a number', c => !('vsAt' in c.inc.progress) || typeof c.inc.progress.vsAt === 'number']
+  ['progress.vsAt (if present) is a number', c => !('vsAt' in c.inc.progress) || typeof c.inc.progress.vsAt === 'number'],
+  ['progress.unlocked (if present) is a list of pack icon ids', c => !('unlocked' in c.inc.progress) || (Array.isArray(c.inc.progress.unlocked) && c.inc.progress.unlocked.every(i => PACK_ICON_IDS.includes(i)))],
+  ['progress.packs (if present) is a list of at most 200; packLog a list', c => (!('packs' in c.inc.progress) || (Array.isArray(c.inc.progress.packs) && c.inc.progress.packs.length <= 200)) && (!('packLog' in c.inc.progress) || Array.isArray(c.inc.progress.packLog))],
+  ['progress.finishes is a map; finishOn values are finish ids', c => (!('finishes' in c.inc.progress) || isObj(c.inc.progress.finishes)) && (!('finishOn' in c.inc.progress) || (isObj(c.inc.progress.finishOn) && Object.values(c.inc.progress.finishOn).every(f => FINISH_IDS.includes(f))))]
 ]);
 
 export const RULES = [

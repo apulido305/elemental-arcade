@@ -888,6 +888,7 @@ function settle(idx) {
       R.cardsGiven[q.cardId] = true;
       const S = Arc.S, before = S.owned[q.cardId] || 0;
       S.owned[q.cardId] = before + 1;
+      if (Arc.earnPack && before < Arc.GOLD_AT && before + 1 >= Arc.GOLD_AT) Arc.earnPack('gold', q.cardId);   // first Gold Legend: a pack
       const t0 = Arc.tierOf(before), t1 = Arc.tierOf(before + 1);
       info.up = (t0 >= 0 && t1 > t0) ? t1 : -1; info.isNew = !before;
       try { Arc.save(); } catch (e) { /* ignore */ }
@@ -1227,6 +1228,9 @@ function award() {
     else if (place !== 1) { v.l++; v.streak = 0; }
     S.vs = v; S.vsAt = Date.now(); rw.record = v;
   }
+  // A win (1st place, at least 2 players who competed) earns one pack per match id. earnPack refuses a repeat, so
+  // reopening this screen cannot pay twice; a rematch has a new id and can pay again. Guests earn packs too.
+  if (finished && place === 1 && competed >= 2 && Arc.earnPack) rw.pack = Arc.earnPack('vs', R.code);
   R.rewards = rw;
   try { Arc.save(); } catch (e) { /* ignore */ }
   if (rw.lvAfter > rw.lvBefore) tone('level'); else tone('win');
@@ -1252,6 +1256,7 @@ function resultHTML() {
   let rewards = '';
   if (rw.finished && !abandoned) {
     rewards = '<p class="vs-sub">You placed <b style="color:var(--gold)">' + ordinal(rw.place) + '</b> of ' + rw.total + '.' + (rw.bonus ? ' Placement bonus +' + rw.bonus + ' XP.' : '') + ' Cards earned: ' + rw.cards + '.</p>' +
+      (rw.pack ? '<p data-vs="pack-earned"><span class="vs-pill">PACK EARNED: open it from your binder</span></p>' : '') +
       (rw.lvAfter > rw.lvBefore ? '<p><span class="vs-pill">LEVEL UP: Lv ' + rw.lvAfter + ' ' + esc(Arc.levelInfo(S.xp).title) + '</span></p>' : '') +
       (rw.record ? '<p class="vs-sub" data-vs="vs-result-record">VS record: ' + rw.record.w + '-' + rw.record.l + (rw.record.streak ? ' &middot; streak ' + rw.record.streak : '') + '</p>' : '');
   } else rewards = '<p class="vs-sub">' + (meP.abandoned || R.kicked ? 'You were disconnected before the end, so there is no placement bonus.' : abandoned ? 'Everyone left before the end.' : 'No placement bonus this time.') + '</p>';

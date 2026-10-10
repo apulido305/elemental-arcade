@@ -29,6 +29,18 @@ Students enter a class code, a nickname and a 4 to 6 digit PIN. The game turns t
 
 Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon button next to their level. There is no upload, drawing or free text, and only the icon's id is stored, never an image. Guests keep theirs in this browser only; signed-in students keep theirs on their player document (`icon` next to `nick`), so it follows them to any device. In VS Arena the icon is copied onto the student's seat in the match so classmates can see it; the rules accept only the 16 ids.
 
+## Packs
+
+Students earn a pack in two ways: win a VS Arena match (1st place, with at least 2 players who competed; one pack per match), or take a card to Gold Legend for the first time (one pack per card, ever). Packs are earned only. There is nothing to buy.
+
+A gold badge on the Binder button counts unopened packs. Open one from the binder: swipe across the top of the pack (phone), or click it or press "Tear open" (computer). Three cards deal face down; tap each to flip it. With reduced motion turned on, the button says "Open" and the results appear at once.
+
+Each pack has 3 cards: a staple (a special finish on one of your cards, or XP), an icon pull (one of 34 pack-only icons in Common, Uncommon, Rare and Epic bands, or a gold icon), and a chase card (usually XP, sometimes a rare, epic or gold icon, including a 0.05% "this week's gold"). Every number is posted in the binder under "Pack odds", and in `design/pack-odds.md`. No duplicates: an owned pull drops a band, then turns into XP. The 16 starter icons stay free. Finishes are cosmetic and never change a card's level.
+
+Guests keep their packs, finishes and unlocked icons on the device (local storage), as with their cards. Signed-in students keep them on their account, and they merge across devices without duplicating a pack or losing an unlock.
+
+Art: the pack icons and gold icons reuse the existing icon art (`design/icons/`), resized into `img/icons/`. The pack wrapper is CSS. No fal.ai art was generated for packs (`design/pack-art.md`). The fal.ai key provided for this work was never written to the repository.
+
 ## VS Arena (live multiplayer, 2 to 20 players)
 
 One signed-in student hosts, picks a deck and room, and puts a 6-character code on the board. Classmates join on their phones by typing the code, from the class lobby, or as a guest. The host has 10 minutes to start, counted from when the second player joins (while the host waits alone there is no countdown; an empty lobby is cleaned up after an hour). Everyone gets the same questions in the same order (a seed stored on the match feeds the question builder). The host picks 10, 15 or 20 questions (solo players pick the same on the home screen). Each question is 15 seconds, then a 2.5 second reveal. Faster correct answers score 100 to 150 points. A two-player match gets the fighting-game VS splash; three or more get the arena ladder. A 10-question match takes about 3 to 4 minutes (20 questions about 6). Before the podium, every phone takes a few seconds to check the final scores with the server, so an answer from a slow connection that arrives up to 8 seconds after its question closed still counts. The host can start a rematch (new code, new seed).
