@@ -1,5 +1,5 @@
-// Profile icons: preset picker, persistence (guest: this browser only; signed in: the player doc), the copy on a
-// match seat, and the fallback for unknown ids. Rules cases for icons live in rules.spec.js.
+// Profile icons: preset picker, persistence (guest: this browser only, in the shared Binder store; signed in: the
+// profile doc), the copy on a match seat, and the fallback for unknown ids. Rules cases for icons live in rules.spec.js.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, PHONE, DESKTOP } from '../helpers/fixtures.js';
@@ -7,7 +7,9 @@ import { openVs, hostArena, joinByCodeOk, seatKids } from '../helpers/vs.js';
 import { layoutProblems } from '../helpers/layout.js';
 
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'ux');
-const KEY = 'elemental-arcade-v1';
+const KEY = 'elemental-arcade-v1';   // the pre-Binder guest save (migrated on load)
+const PKEY = 'arcade-v1-prefs:chem';
+const guestIcon = page => page.evaluate(() => Binder.guestAll().profile.icon);
 const headerIcon = page => page.locator('[data-act="icons"] .av').getAttribute('data-icon');
 
 async function pickIcon(page, id) {
@@ -74,7 +76,7 @@ test('guest pick survives a reload from this browser and never touches /players'
   const dev = await arena.device({ width: PHONE }), p = dev.page;
   await dev.goto('/');
   await pickIcon(p, 'magnet');
-  expect(await p.evaluate(k => JSON.parse(localStorage.getItem(k)).icon, KEY)).toBe('magnet');
+  expect(await guestIcon(p)).toBe('magnet');
   await p.reload(); await dev.cloudReady();
   expect(await headerIcon(p)).toBe('magnet');
   await expect(p.locator('[data-act="account"] .av')).toHaveAttribute('data-icon', 'magnet');
@@ -92,7 +94,12 @@ test('unknown or hostile icon ids fall back to atom and are never rendered as ma
   const dev = await arena.device({ width: PHONE }), p = dev.page;
   await dev.goto('/');
   expect(await p.evaluate(() => [Arcade.iconOf('nope'), Arcade.iconOf(undefined), Arcade.iconOf(42), Arcade.iconOf('flask')])).toEqual(['atom', 'atom', 'atom', 'flask']);
+  // in an old pre-Binder guest save (migrated on load), and in the shared store
   await p.evaluate(k => localStorage.setItem(k, JSON.stringify({ icon: '<img src=x onerror="window.__pwned=1">', owned: {} })), KEY);
+  await p.reload(); await dev.cloudReady();
+  expect(await headerIcon(p)).toBe('atom');
+  expect(await p.locator('#app img').count()).toBe(0);
+  await p.evaluate(() => localStorage.setItem('arcade-v1', JSON.stringify({ profile: { icon: '<img src=x onerror="window.__pwned=1">', iconAt: 9 }, games: {} })));
   await p.reload(); await dev.cloudReady();
   expect(await headerIcon(p)).toBe('atom');
   expect(await p.locator('#app img').count()).toBe(0);
@@ -106,7 +113,7 @@ test('unknown or hostile icon ids fall back to atom and are never rendered as ma
   expect(dev.errors).toEqual([]); expect(host.errors).toEqual([]);
 });
 
-test('signed-in pick is saved on the player doc, survives later progress saves, and follows the student to another device', async ({ arena }) => {
+test('signed-in pick is saved on the profile doc, survives later progress saves, and follows the student to another device', async ({ arena }) => {
   const dev = await arena.device({ width: DESKTOP }), p = dev.page;
   await dev.goto('/');
   await dev.signUpViaUI('class1', 'ada', '1234');
@@ -114,12 +121,12 @@ test('signed-in pick is saved on the player doc, survives later progress saves, 
   expect(arena.backend.adminGet('players/' + uid).icon).toBe('atom');
   await pickIcon(p, 'comet');
   await expect.poll(() => arena.backend.adminGet('players/' + uid).icon, { timeout: 8000 }).toBe('comet');
-  // a later progress save (solo round) keeps the icon; the icon is top-level, not inside progress
+  // a later progress save (solo round, games/chem) keeps the icon on the profile
   await soloRound(p);
-  await expect.poll(() => arena.backend.adminGet('players/' + uid).progress.rounds, { timeout: 8000 }).toBe(1);
+  await expect.poll(() => arena.backend.adminGet(`players/${uid}/games/chem`)?.rounds, { timeout: 8000 }).toBe(1);
   const doc = arena.backend.adminGet('players/' + uid);
   expect(doc.icon).toBe('comet');
-  expect(doc.progress.icon).toBeUndefined();
+  expect(doc.progress).toBeUndefined();                                      // a Binder account never gets the pre-Binder map
   await p.locator('[data-act="account"]').click();
   await expect(p.locator('[data-ui="account-icon"] .av')).toHaveAttribute('data-icon', 'comet');
   // another device
@@ -138,9 +145,9 @@ test('signed-in pick is saved on the player doc, survives later progress saves, 
 test('newer side wins: a pick on this device not yet saved beats the doc; an older one does not (merge, not max)', async ({ arena }) => {
   const dev = await arena.device({ width: PHONE }), p = dev.page;
   await dev.goto('/');
-  // the merge function on its own
+  // the merge function on its own (binder.js mergeIcon, which saveGame uses)
   const cases = await p.evaluate(() => {
-    const m = Cloud._merge.icon, ts = ms => ({ toMillis: () => ms });
+    const m = (doc, local) => Binder.mergeIcon(doc, local, [], 'atom'), ts = ms => ({ toMillis: () => ms });
     return [
       m({ icon: 'flask', updated: ts(2000) }, { icon: 'moon', iconAt: 1000 }),   // doc newer
       m({ icon: 'flask', updated: ts(2000) }, { icon: 'moon', iconAt: 3000 }),   // device newer
@@ -155,16 +162,16 @@ test('newer side wins: a pick on this device not yet saved beats the doc; an old
   await pickIcon(p, 'spark');
   await expect.poll(() => arena.backend.adminGet('players/' + uid).icon, { timeout: 8000 }).toBe('spark');
   // refresh right after a pick, before the debounced save could run: the device copy is newer, so it wins and is saved
-  await p.evaluate(() => { localStorage.setItem('elemental-arcade-v1-prefs', JSON.stringify({ mute: false, deck: 's20', room: 'mixed', icon: 'wave', iconAt: Date.now() + 60000, iconFor: 'class1_bea' })); });
+  await p.evaluate(k => { localStorage.setItem(k, JSON.stringify({ mute: false, deck: 's20', room: 'mixed', icon: 'wave', iconAt: Date.now() + 60000, iconFor: 'class1_bea' })); }, PKEY);
   await p.reload(); await dev.cloudReady();
   await expect.poll(() => headerIcon(p)).toBe('wave');
   await expect.poll(() => arena.backend.adminGet('players/' + uid).icon, { timeout: 8000 }).toBe('wave');
   // an older device copy loses to the doc
-  await p.evaluate(() => { localStorage.setItem('elemental-arcade-v1-prefs', JSON.stringify({ mute: false, deck: 's20', room: 'mixed', icon: 'bolt', iconAt: 1000, iconFor: 'class1_bea' })); });
+  await p.evaluate(k => { localStorage.setItem(k, JSON.stringify({ mute: false, deck: 's20', room: 'mixed', icon: 'bolt', iconAt: 1000, iconFor: 'class1_bea' })); }, PKEY);
   await p.reload(); await dev.cloudReady();
   await expect.poll(() => headerIcon(p)).toBe('wave');
   // a device copy that belongs to someone else is ignored
-  await p.evaluate(() => { localStorage.setItem('elemental-arcade-v1-prefs', JSON.stringify({ icon: 'crown', iconAt: Date.now() + 60000, iconFor: 'class1_someoneelse' })); });
+  await p.evaluate(k => { localStorage.setItem(k, JSON.stringify({ icon: 'crown', iconAt: Date.now() + 60000, iconFor: 'class1_someoneelse' })); }, PKEY);
   await p.reload(); await dev.cloudReady();
   await expect.poll(() => headerIcon(p)).toBe('wave');
   expect(arena.backend.denials).toEqual([]);
@@ -204,19 +211,20 @@ test('guest changes the icon on the join screen before joining; the seat carries
   await expect(host.page.locator(`[data-vs="lobby-players"] li[data-uid="${hostUid}"] .av`)).toHaveAttribute('data-icon', 'crown');
   // only the host has a /players doc; the guest's icon lives in their browser and their seat
   expect(arena.backend.adminList('players').map(d => d.id)).toEqual([hostUid]);
-  expect(await g.page.evaluate(k => JSON.parse(localStorage.getItem(k)).icon, KEY)).toBe('rocket');
+  expect(await guestIcon(g.page)).toBe('rocket');
   expect(arena.backend.denials).toEqual([]);
   expect(host.errors).toEqual([]); expect(g.errors).toEqual([]);
 });
 
-test('before the teacher republishes the rules (old rules reject icon): saves, hosting and guest joins still work, just without icons', async ({ arena }) => {
+// The profile doc needs the shared Binder rules (they accept icons), so only VS seats keep an old-rules fallback.
+test('if the seat rules reject icon (old rules): hosting and guest joins still work, just without icons on the seats', async ({ arena }) => {
   test.setTimeout(90000);
-  // Same process as the backend: add an "old rules" clause to the /players and seat writes, and undo it afterwards.
+  // Same process as the backend: add an "old rules" clause to the seat writes, and undo it afterwards.
   const { RULES } = await import('../fake/rules.js');
   const noIcon = ['old rules: no icon key', c => !c.inc || !('icon' in c.inc)];
   const saved = RULES.map(r => ({ ...r }));
   for (const r of RULES) {
-    if (r.path !== 'players/{uid}' && r.path !== 'matches/{code}/players/{pid}') continue;
+    if (r.path !== 'matches/{code}/players/{pid}') continue;
     for (const op of ['create', 'update']) {
       const spec = r[op]; if (!spec) continue;
       r[op] = spec[0] && spec[0].clauses ? spec.map(a => ({ name: a.name, clauses: a.clauses.concat([noIcon]) })) : spec.concat([noIcon]);
@@ -225,15 +233,9 @@ test('before the teacher republishes the rules (old rules reject icon): saves, h
   try {
     const host = await arena.device({ width: DESKTOP }), g = await arena.device({ width: PHONE });
     await host.goto('/'); await g.goto('/');
-    await host.signUp('class1', 'oldrules');                                         // sign-up doc retried without the icon
-    const uid = (await host.currentUser()).uid;
-    expect(arena.backend.adminGet('players/' + uid)).toMatchObject({ nick: 'oldrules' });
-    expect(arena.backend.adminGet('players/' + uid).icon).toBeUndefined();
+    await host.signUp('class1', 'oldrules');
     await pickIcon(host.page, 'bolt');
-    await soloRound(host.page);
-    await expect.poll(() => arena.backend.adminGet('players/' + uid).progress.rounds, { timeout: 8000 }).toBe(1);   // progress still saves
     expect(await headerIcon(host.page)).toBe('bolt');                               // still shown on this device
-    await host.page.locator('[data-ui="results-bar"] [data-act="home"]').click();
     const code = await hostArena(host);
     await openVs(g);
     await g.page.locator('[data-vs="guest-icon"]').click();

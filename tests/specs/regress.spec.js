@@ -33,7 +33,8 @@ test('sign up, sign out, sign in again through the account screen; progress come
   await dev.goto('/');
   await dev.signUpViaUI('class1', 'ada', '1234');
   await soloRound(dev.page);
-  await expect.poll(() => arena.backend.adminList('players')[0]?.progress.rounds, { timeout: 8000 }).toBe(1);
+  const uid = (await dev.currentUser()).uid;
+  await expect.poll(() => arena.backend.adminGet(`players/${uid}/games/chem`)?.rounds, { timeout: 8000 }).toBe(1);
   const xp = await dev.page.evaluate(() => Arcade.S.xp);
   await dev.page.click('[data-act="account"]');
   await dev.page.click('[data-act="signout"]');

@@ -5,7 +5,8 @@ import { TS, hostArena, joinByCodeOk, startMatch, correctIndexes, playMatch } fr
 import { expectDenied, signedKid, openLobby, guest } from '../helpers/arena.js';
 import { layoutProblems } from '../helpers/layout.js';
 
-const KEY = 'elemental-arcade-v1';
+// Guests keep packs in the shared Binder store ('arcade-v1'); packs, unlocks and finishes are account-wide (the profile).
+const guestProfile = p => p.evaluate(() => Binder.guestAll().profile);
 const SHOTS = '../docs/packs/';
 const packs = p => p.evaluate(() => Arcade.S.packs.map(x => x.id));
 // Answer the current solo question correctly (or wrongly) through the real buttons.
@@ -117,9 +118,10 @@ test.describe('earning', () => {
     await expect(kid.page.locator('[data-vs="pack-earned"]')).toHaveCount(0);
     expect(await host.page.evaluate(c => Arcade.earnPack('vs', c), code)).toBe(false);   // the same match cannot pay twice
     expect(await packs(host.page)).toEqual(['vs:' + code, today]);
-    // the pack reached the account (cloud save), and the rules accepted it
+    // the pack reached the account (cloud save, the account-wide profile), and the rules accepted it
     const uid = await host.page.evaluate(() => Cloud.uid());
-    await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packs || []).map(x => x.id), { timeout: 8000 }).toEqual(['vs:' + code, today]);
+    await expect.poll(() => (arena.backend.adminGet('players/' + uid).packs || []).map(x => x.id), { timeout: 8000 }).toEqual(['vs:' + code, today]);
+    expect(arena.backend.adminGet('players/' + uid).packs.every(x => x.game === 'chem')).toBe(true);   // tagged with the game that rolled it
     expect(arena.backend.denials.filter(d => d.op !== 'get' && d.op !== 'list'), JSON.stringify(arena.backend.denials.slice(0, 2))).toEqual([]);
   });
 });
@@ -137,7 +139,7 @@ test.describe('opening', () => {
     await p.locator('[data-pk="tear"]').click();
     await expect(p.locator('.pkcard.up')).toHaveCount(3);                             // all three face up at once
     await p.locator('[data-pk="done"]').click();
-    const s = await p.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
+    const s = await guestProfile(p);
     expect(s.unlocked).toEqual(['axolotl', 'cat-gold']);
     expect(s.packs).toEqual([]); expect(s.packLog).toContain('open:gold:demo');
     expect(s.finishes[await p.evaluate(() => Arcade.ALL[1].id)]).toEqual(['ember']);
@@ -150,7 +152,7 @@ test.describe('opening', () => {
     expect(arena.backend.adminList('players')).toEqual([]);
     expect(arena.backend.denials).toEqual([]);
     // a locked id is refused even if it lands in storage by hand
-    await p.evaluate(k => { const g = JSON.parse(localStorage.getItem(k)); g.icon = 'dragon-gold'; localStorage.setItem(k, JSON.stringify(g)); }, KEY);
+    await p.evaluate(() => { const g = Binder.guestAll(); g.profile.icon = 'dragon-gold'; g.profile.iconAt = Date.now(); localStorage.setItem('arcade-v1', JSON.stringify(g)); });
     await p.reload(); await p.waitForSelector('[data-act="deck"]');
     await expect(p.locator('[data-act="icons"] .av')).toHaveAttribute('data-icon', 'atom');
   });
@@ -213,7 +215,7 @@ test.describe('signed in: merge and rules', () => {
       const A = { id: 'vs:AAAAAA', slots: [] }, B = { id: 'gold:x', slots: [] }, C = { id: 'gold:y', slots: [] };
       const doc = { packs: [A, B], packLog: ['vs:AAAAAA', 'gold:x', 'gold:y', 'open:gold:y'], unlocked: ['cat'], finishes: { h: ['foil'] }, finishOn: { h: 'foil' }, xp: 50 };
       const here = { packs: [A, C], packLog: ['vs:AAAAAA', 'gold:y', 'gold:x', 'open:gold:x'], unlocked: ['dog', 'cat'], finishes: { h: ['night'] }, finishOn: { h: 'night' }, xp: 80 };
-      return Cloud._merge.progress(doc, here);
+      return Binder.mergeAccount(doc, here);   // what Binder.saveGame does with the profile's account half
     });
     expect(m.packs.map(x => x.id)).toEqual(['vs:AAAAAA']);                         // B and C were opened on one side
     expect(m.unlocked.sort()).toEqual(['cat', 'dog']);
@@ -226,7 +228,7 @@ test.describe('signed in: merge and rules', () => {
   test('rules: unlocked must be pack icon ids, finishOn must be a finish; the icon must be free or unlocked (doc and seat)', async ({ arena }) => {
     const kid = await signedKid(arena, 'kid'), F = kid.F, me = kid.ref('players', kid.uid);
     const base = (await F.getDoc(me)).data();
-    const put = (prog, icon) => F.setDoc(me, Object.assign({}, base, { progress: Object.assign({}, base.progress, prog), icon: icon || 'atom', updated: F.serverTimestamp() }));
+    const put = (acc, icon) => F.setDoc(me, Object.assign({}, base, acc, { icon: icon || 'atom', updated: F.serverTimestamp() }));   // the profile doc
     await expectDenied(put({ unlocked: ['unicorn'] }), 'pack icon ids');
     await expectDenied(put({ unlocked: ['atom'] }), 'pack icon ids');               // free icons are never "unlocked"
     await expectDenied(put({ finishOn: { h: 'sparkly' } }), 'finish ids');
@@ -281,7 +283,7 @@ test.describe('daily pack', () => {
     await expect(p.locator('[data-act="pack-open"]')).toContainText('Earned: daily practice');
     // the claim syncs: tomorrow on this account pays again, today on another device does not
     const uid = await p.evaluate(() => Cloud.uid());
-    await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packLog || []).includes(today), { timeout: 8000 }).toBe(true);
+    await expect.poll(() => (arena.backend.adminGet('players/' + uid).packLog || []).includes(today), { timeout: 8000 }).toBe(true);
     const other = await arena.device({ width: PHONE, dailyReminder: true }), q = other.page;
     await other.goto('/'); await other.signIn('daily');
     await expect(q.locator('[data-ui="daily-modal"]')).toHaveCount(0);                 // already claimed today

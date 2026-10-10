@@ -92,7 +92,7 @@ test.describe('auth fake', () => {
   test('email/password users, duplicate and wrong-password errors, anonymous users, provider switch', async ({ arena }) => {
     const a = arena.client('a'); await a.signUp('class1', 'ann', '4321');
     const uid = a.uid; expect(a.auth.currentUser.isAnonymous).toBe(false);
-    expect(a.auth.currentUser.email).toBe('class1_ann@players.elemental-arcade.example');
+    expect(a.auth.currentUser.email).toBe('class1_ann@players.arcade.example');   // the shared Binder scheme
     await a.signOut(); expect(a.uid).toBeNull();
     const dup = arena.client('dup');
     await expectCode(dup.signUp('class1', 'ann', '9999'), 'auth/email-already-in-use');

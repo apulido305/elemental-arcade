@@ -101,7 +101,7 @@ test('host + 3 clients (lobby, code, guest): same questions, different speeds, t
   expect(Object.keys(owned).length).toBe(rightCards);                                   // 8 correct answers => 8 cards moved
   expect(Object.values(owned).every(n => n === 3)).toBe(true);                           // +1 each, never more
   expect(await kid.page.evaluate(() => window.__pills)).toEqual(expect.arrayContaining([expect.stringMatching(/CARD LEVEL UP: HOLO/)]));
-  await expect.poll(() => arena.backend.adminGet('players/' + uh).progress.vs?.w, { timeout: 8000 }).toBe(1);   // cloud save of the record
+  await expect.poll(() => arena.backend.adminGet(`players/${uh}/games/chem`)?.vs?.w, { timeout: 8000 }).toBe(1);   // cloud save of the record (per game)
   expect(arena.backend.adminGet('players/' + ug)).toBeNull();                             // never a /players doc for a guest
   expect(await host.page.evaluate(() => Arcade.S.xp)).toBeGreaterThan(0);                 // placement bonus + per-correct XP landed
   await expect(host.page.locator('[data-vs="vs-result-record"]')).toContainText('1-0');

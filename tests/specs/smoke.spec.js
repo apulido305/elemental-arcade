@@ -36,11 +36,11 @@ test('sign up through the fake (account screen), cloud save lands in /players, s
   await dev.signUpViaUI('class1', 'ada', '1234');
   const user = await dev.currentUser();
   expect(user.isAnonymous).toBe(false);
-  expect(user.email).toBe('class1_ada@players.elemental-arcade.example');
+  expect(user.email).toBe('class1_ada@players.arcade.example');           // the shared Binder account scheme
   const saved = arena.backend.adminGet('players/' + user.uid);
   expect(saved).toMatchObject({ nick: 'ada', cls: 'class1' });
-  await playSoloRound(dev.page);                                     // progress is saved to /players through the rules fake
-  await expect.poll(() => arena.backend.adminGet('players/' + user.uid).progress.rounds).toBe(1);
+  await playSoloRound(dev.page);                                     // progress is saved through the Binder and the rules fake
+  await expect.poll(() => arena.backend.adminGet(`players/${user.uid}/games/chem`)?.rounds).toBe(1);
   expect(arena.backend.denials).toEqual([]);
   // second device signs in as the same account and sees the cloud progress
   const dev2 = await arena.device({ width: PHONE });

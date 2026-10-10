@@ -70,7 +70,16 @@ export class Arena {
     const page = await context.newPage();
     const d = new Device(this, context, page, name); d.firebase = firebase;
     page.on('pageerror', e => d.errors.push('pageerror: ' + e.message));
-    page.on('console', m => { if (m.type() === 'error') d.errors.push('console.error: ' + m.text()); });
+    // Another arcade game's files (its cards.json, its icon art) are not part of this repo: tests never fetch them, and a
+    // failed load from another origin is not this page's error. Local 404s still count. A test that needs another game's
+    // cards.json routes it after this (Playwright tries the newest route first).
+    await context.route(/^https:\/\/apulido305\.github\.io\//, route => route.fulfill({ status: 404, body: '' }));
+    page.on('console', m => {
+      if (m.type() !== 'error') return;
+      const at = (m.location() || {}).url || '';
+      if (/Failed to load resource/.test(m.text()) && at && !at.startsWith(this.origin)) return;
+      d.errors.push('console.error: ' + m.text() + (at ? ' (' + at + ')' : ''));
+    });
     this.devices.push(d); return d;
   }
   /** Scripted (browserless) player on the shared backend. */
