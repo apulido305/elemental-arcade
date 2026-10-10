@@ -31,7 +31,7 @@ Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon
 
 ## Packs
 
-Students earn a pack in two ways: win a VS Arena match (1st place, with at least 2 players who competed; one pack per match), or take a card to Gold Legend for the first time (one pack per card, ever). Packs are earned only. There is nothing to buy.
+Students earn a pack in three ways: win a VS Arena match (1st place, with at least 2 players who competed; one pack per match), take a card to Gold Legend for the first time (one pack per card, ever), or, signed in, finish their first room round or VS match of the day (one daily pack per day; signing in alone does not earn it). The first time a signed-in student opens the game each day, a pop-up reminds them that today's free pack is waiting. Packs are earned only. There is nothing to buy.
 
 A gold badge on the Binder button counts unopened packs. Open one from the binder: swipe across the top of the pack (phone), or click it or press "Tear open" (computer). Three cards deal face down; tap each to flip it. With reduced motion turned on, the button says "Open" and the results appear at once.
 

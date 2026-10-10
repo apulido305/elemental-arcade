@@ -306,6 +306,11 @@ main.enter>*{animation:fadeIn .3s backwards}
 .packrow{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 14px}
 .minipack{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 14px 8px 8px;border-radius:14px;border:2px solid var(--gold);background:var(--panel2);color:var(--text);font:400 15px/1.2 var(--body);cursor:pointer;text-align:left}
 .minipack b{display:block;font:400 18px/1.1 var(--display);color:var(--gold);margin-top:2px}
+#daily .modal{z-index:80}
+.dailybox{max-width:340px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.dailybox .pkart.lg{width:120px;margin-bottom:6px}
+.dailybox p{margin:0}
+.dailybox .actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center}
 .odds{margin-top:6px}
 .odds summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font:400 19px/1.2 var(--display);color:var(--gold)}
 .oddsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0}
@@ -1059,7 +1064,7 @@ function earnPack(reason,ref){
   if(S.packLog.includes(id)||S.packs.some(p=>p.id===id))return false;
   const at=Date.now(),seed=(Math.random()*4294967296)>>>0,week=weekOf(at);
   const p={id,at,reason,seed,week,slots:rollPack(seed,week,packHave())};
-  if(reason==='vs')p.matchId=String(ref);else p.cardId=String(ref);
+  if(reason==='vs')p.matchId=String(ref);else if(reason==='day')p.day=String(ref);else p.cardId=String(ref);
   S.packs.push(p);S.packLog.push(id);save();
   toast('Pack earned! Open it from your binder.');
   const b=document.querySelector('[data-act="binder"]');if(b)b.outerHTML=binderBtnHTML();
@@ -1076,6 +1081,30 @@ function applyPack(p){
   S.packs=S.packs.filter(q=>q.id!==p.id);
   if(!S.packLog.includes('open:'+p.id))S.packLog.push('open:'+p.id);
   save();
+}
+/* Daily pack: a signed-in student's first finished room round or VS match each day earns one pack. The key
+   'day:YYYY-MM-DD' (device's local date) goes into packLog, which syncs, so a second device the same day pays
+   nothing. Guests do not get it (it is also a reason to sign in). The first time a signed-in student opens the
+   game each day, a pop-up reminds them (only if today's pack is still unclaimed). */
+const dayKey=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const dailyOpen=()=>!!ACCT&&!S.packLog.includes('day:'+dayKey());
+// Called when a room round or a VS match finishes. Returns true if it paid today's pack.
+function dailyPack(){return dailyOpen()&&earnPack('day',dayKey())}
+function dailyReminder(){
+  if(!dailyOpen()||window.__E2E_NO_DAILY_REMINDER)return;   // the test flag is set only by tests/helpers/fixtures.js
+  const k=KEY+'-daily-'+acctKey();
+  try{if(localStorage.getItem(k)===dayKey())return;localStorage.setItem(k,dayKey())}catch(e){}   // once a day per account on this device
+  if(document.getElementById('daily'))return;
+  const r=document.createElement('div');r.id='daily';
+  r.innerHTML='<div class="modal daily" role="dialog" aria-modal="true" aria-labelledby="daily-h" data-ui="daily-modal"><div class="panel dailybox">'+packArt('lg')+
+    '<h2 class="prompt" id="daily-h">Today\'s free pack is waiting!</h2><p>Complete <b>1 room</b> or <b>VS match</b> to earn it.</p><p class="sub">Practice every day to win a free pack.</p>'+
+    '<div class="actions"><button class="btn ghost" data-daily="later">Later</button><button class="btn" data-daily="play">Play a room</button></div></div></div>';
+  document.body.appendChild(r);
+  const b=r.querySelector('[data-daily="play"]');if(b)b.focus({preventScroll:true});
+  const close=()=>{r.remove();document.removeEventListener('keydown',esc1)};
+  const esc1=e=>{if(e.key==='Escape')close()};
+  document.addEventListener('keydown',esc1);
+  r.addEventListener('click',e=>{const t=e.target.closest('[data-daily]');if(!t)return;close();if(t.dataset.daily==='play'){V.roomMsg='';startRound(playRoom().id)}});
 }
 let TOASTT=0;
 function toast(msg){
@@ -1147,6 +1176,7 @@ function next(){
   V.lvBefore=levelInfo(S.xp).lvl;S.xp+=V.xpGain;V.lvAfter=levelInfo(S.xp).lvl;
   const k=V.roomId+'|'+V.deckId;S.stars[k]=Math.max(S.stars[k]||0,V.stars);
   S.rounds++;S.best=Math.max(S.best,V.best);save();
+  V.packReady=dailyPack();   // first finished round today: the daily pack
   V.screen='results';V.anim='results';V.fx=V.perfect?'perfect':'';tone('win');render();window.scrollTo(0,0);
 }
 
@@ -1258,7 +1288,7 @@ function resultsHTML(){
   const missed=V.missed.length?'<section><h2 class="h" style="font-size:22px">Review these</h2><p class="sub">Tap a name to see its card.</p><div class="chips" style="margin-top:10px">'+V.missed.map(id=>'<button class="chip" data-act="open" data-id="'+id+'">'+esc(BY[id].name)+'</button>').join('')+'</div></section>':'';
   return (S.rounds>0?noticeHTML():'')+'<div class="res"><section class="panel"><div class="qmeta">'+roomOf(V.roomId).name+' · '+DECKS.find(d=>d.id===V.deckId).name+'</div><h1 class="prompt" style="margin-bottom:10px">'+title+'</h1>'+starsHTML(V.stars,true)+nextStarHTML()+
   '<div class="stats" style="margin-top:16px"><div class="stat"><span>Correct</span><b data-count="'+correct+'" data-post="/'+V.qs.length+'">'+correct+'/'+V.qs.length+'</b></div><div class="stat"><span>Score</span><b data-count="'+V.score+'">'+V.score+'</b></div><div class="stat"><span>XP earned</span><b data-count="'+V.xpGain+'" data-pre="+">+'+V.xpGain+'</b></div><div class="stat"><span>Best streak</span><b data-count="'+V.best+'" data-pre="×">×'+V.best+'</b></div></div>'+
-  (V.perfect?'<p class="sub" style="margin-top:12px">Perfect round bonus: +20 XP.</p>':'')+'</section>'+lv+upsec+pack+missed+'</div>'+
+  (V.perfect?'<p class="sub" style="margin-top:12px">Perfect round bonus: +20 XP.</p>':'')+(V.packReady?'<p class="sub" data-ui="pack-ready" style="margin-top:12px"><b style="color:var(--gold)">Daily pack earned!</b> Open it from your binder. Come back tomorrow for another.</p>':'')+'</section>'+lv+upsec+pack+missed+'</div>'+
   '<div class="stickybar" data-ui="results-bar"><button class="btn ghost" data-act="home">Pick a room</button><button class="btn" data-act="again">Play again</button></div>';
 }
 function binderHTML(){
@@ -1275,7 +1305,8 @@ function binderHTML(){
   empty+'<div class="tabs" role="tablist" style="margin-bottom:18px">'+tabHTML+'</div><div class="grid">'+cells+'</div>';
 }
 /* Binder top: unopened packs, then the odds in plain numbers (straight from PACK_ODDS, so they cannot drift). */
-const packWhy=p=>p.reason==='vs'?'VS win':'Gold Legend: '+((BY[p.cardId]||{}).name||'a card');
+// Why the pack was earned (never what is inside).
+const packWhy=p=>p.reason==='vs'?'Earned: VS win':p.reason==='day'?'Earned: daily practice':'Earned: '+((BY[p.cardId]||{}).name||'a card')+' reached Gold Legend';
 // The pack itself (big and binder thumbnail) is generated art, img/pack.webp (design/pack-art.md) with a CSS sheen;
 // card backs keep the CSS foil design.
 const packArt=sz=>sz==='card'?'<span class="pkart card" aria-hidden="true"><span class="pkfoil"></span><span class="pklogo">'+atomLogo+'</span><span class="pkcrimp t"></span><span class="pkcrimp b"></span></span>'
@@ -1294,7 +1325,7 @@ function oddsHTML(){
   const lab={finish:'A special finish on one of your cards (Foil, Prism, Night Sky or Ember)',b0:'A Common icon',b1:'An Uncommon icon',b2:'A Rare icon',b3:'An Epic icon',gold:'A gold icon (any of the 50, picked evenly)',feat:"This week's gold: "+iconLabel(fg)};
   const t=(tab)=>tab.map(r=>row(r[1],r[0]==='xp'?'+'+r[2]+' XP':lab[r[0]])).join('');
   return '<details class="panel odds" data-ui="pack-odds"><summary>Pack odds: what is inside</summary>'+
-  '<p class="sub">Packs are earned, never bought. Win a VS Arena match (1st place, at least 2 players) or take a card to Gold Legend. Each pack has 3 cards, rolled when you earn it.</p>'+
+  '<p class="sub">Packs are earned, never bought. Win a VS Arena match (1st place, at least 2 players), take a card to Gold Legend, or (signed in) finish your first room or VS match of the day for a free daily pack. Each pack has 3 cards, rolled when you earn it.</p>'+
   '<div class="oddsgrid"><table class="vs-tbl"><caption>Card 1: the staple</caption>'+t(s1)+'</table><table class="vs-tbl"><caption>Card 2: the icon pull</caption>'+t(s2)+'</table><table class="vs-tbl"><caption>Card 3: the chase</caption>'+t(s3)+'</table></div>'+
   '<p class="feat" data-ui="weekly-gold">'+iconSVG(fg,40)+'<span><b>This week\'s gold: '+esc(iconLabel(fg))+'</b> 0.05% in card 3. It changes every Monday.</span></p>'+
   '<p class="sub"><b>Common (16):</b> '+bandNames(0)+'.<br><b>Uncommon (10):</b> '+bandNames(1)+'.<br><b>Rare (6):</b> '+bandNames(2)+'.<br><b>Epic (2):</b> '+bandNames(3)+'.</p>'+
@@ -1614,6 +1645,7 @@ function wireCloud(){
       if(local)save();
       if(V.screen==='account'||V.screen==='quiz'||V.screen==='results')V.screen='home';
       V.modal=null;render();
+      dailyReminder();   // after applyProg: the account's packLog says whether today's pack is already claimed
     }else if(ACCT){
       ACCT=null;SYNC='';loadGuest();V.screen='home';V.modal=null;render();
     }else render();
@@ -1647,7 +1679,7 @@ addEventListener('resize',()=>{mclr();clearTimeout(rz);rz=setTimeout(()=>{
 window.Arcade={QNS,S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
   ICONS,ICON_IDS,iconOf,iconSVG,iconGridHTML,setIcon,getIcon:()=>S.icon,
-  WIN_ICONS,GOLD_IDS,PACK_ODDS,FINISHES,GOLD_AT,earnPack,rollPack,packHave,applyPack,featuredGold,weekOf,openPack:id=>openPack(id),
+  WIN_ICONS,GOLD_IDS,PACK_ODDS,FINISHES,GOLD_AT,earnPack,dayKey,dailyPack,dailyReminder,rollPack,packHave,applyPack,featuredGold,weekOf,openPack:id=>openPack(id),
   goto:scr=>{V.anim='screen';V.screen=scr;V.authErr='';V.modal=null;render();window.scrollTo(0,0)},
   burst:(x,y,n,spread,cols)=>{if(!RM.matches)burst(x,y,n,spread,cols||['#f3dd7a','#7fd1f0','#f2a8a3','#fdf6d8','#4caf62'])}};
 render();
@@ -1655,6 +1687,6 @@ render();
 
 <!-- Bump ?v= whenever cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
 <script type="module" src="cloud.js?v=5"></script>
-<script type="module" src="vs.js?v=9"></script>
+<script type="module" src="vs.js?v=10"></script>
 </body>
 </html>

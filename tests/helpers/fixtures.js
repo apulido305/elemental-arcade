@@ -54,7 +54,7 @@ export class Arena {
    * opts: width (390 phone | 1100 desktop), timeScale (window.VS_TIME_SCALE, default 0.1), firebase ('fake' | 'blocked'),
    *       height, fakeOptions (sdk options, e.g. {txMaxAttempts: 5})
    */
-  async device({ width = PHONE, height, timeScale = 0.1, firebase = 'fake', name = 'device' + (this.devices.length + 1), fakeOptions, reducedMotion = false, fonts = false } = {}) {
+  async device({ width = PHONE, height, timeScale = 0.1, firebase = 'fake', name = 'device' + (this.devices.length + 1), fakeOptions, reducedMotion = false, fonts = false, dailyReminder = false } = {}) {
     const phone = width < 600;
     const context = await this.browser.newContext({
       viewport: { width, height: height || (phone ? 844 : 800) }, hasTouch: phone, deviceScaleFactor: 1, reducedMotion: reducedMotion ? 'reduce' : 'no-preference'
@@ -62,6 +62,8 @@ export class Arena {
     if (!fonts) await stubFonts(context);   // fonts: true lets Google Fonts load (screenshots)
     if (firebase === 'fake') await useFakeFirebase(context, { options: fakeOptions });
     else if (firebase === 'blocked') await blockFirebase(context);
+    // The once-a-day sign-in pop-up would cover the page in every test that signs in; only daily-pack tests want it.
+    if (!dailyReminder) await context.addInitScript(() => { window.__E2E_NO_DAILY_REMINDER = true; });
     if (timeScale != null) this.backend.timeScale = timeScale;
     if (timeScale != null) await context.addInitScript(s => { window.VS_TIME_SCALE = s; }, timeScale);
     const page = await context.newPage();
