@@ -1,30 +1,44 @@
 # Elemental Arcade: pack art
 
-## Result: no generated art, $0 spent
+## Result: one generated pack wrapper, about $0.047 spent
 
-The pack wrapper ships as CSS: a navy foil pack with gold crimped edges, a moving foil sheen, the game's atom logo and "ELEMENTAL PACK" (`.pkart` in `index.html`). The card backs in the opening scene use the same CSS. The four finishes and the gold icon treatment are CSS too.
+The pack in the opening scene and the binder thumbnail are `img/pack.webp`, generated with `fal-ai/flux-2/flash`. A CSS foil sheen moves over it, masked to the pack's shape. The tear strip is the top of the same image, so dragging it pulls off the pack's own crimp. Card backs, the four finishes and the gold icon treatment stay CSS.
 
-| Item | Source | Cost |
-|---|---|---|
-| Pack wrapper | CSS (`.pkart`, `.pkfoil`, `.pkcrimp`) | $0 |
-| Card backs | the same CSS | $0 |
-| Finishes (foil, holo, night, ember) | CSS over the existing card | $0 |
-| Gold icons (50) | existing rare art from `design/icons/rare/` (PR #14), resized to 128 px WebP, plus a CSS ring and sheen | $0 |
-| Winnable icons (34) | existing art from `design/icons/new/` and `new2/`, resized to 128 px WebP | $0 |
-| **fal.ai total** | | **$0.00** |
+## Probe (prices checked 2026-10-10)
 
-## Why there is no probe table
+The same prompt went to three models at `image_size: "portrait_4_3"` (768x1024, 0.79 MP), safety checker on:
 
-The plan was to price current fal.ai text-to-image models, probe at most $1.00 on 2 or 3 of them with "flat foil booster pack, navy and gold, no letters", score them, and lock one for a single wrapper.
+`flat foil booster pack, navy and gold, no letters, single sealed trading card pack centered, crimped gold edges, atom symbol, glossy foil sheen, solid dark navy background`
 
-The first fal.ai request (a read-only price lookup) was blocked by the coding agent's safety check (the auto-mode classifier flagged it as credential use). The agent did not retry it or work around it. So no model was priced, probed or used. The task allowed this case ("If the wrapper is not worth a generation, ship a CSS foil pack and spend $0"), so the CSS pack is the shipped design.
+Prices come from the fal.ai pricing API on the day of the probe.
 
-The key was never written to the repo, a commit, a log or any file in the branch.
+| Model | Price | $/image here | Reads as a pack at phone size | No garbled text | On palette | Not a brand ripoff | Avg | Notes |
+|---|---|---:|:-:|:-:|:-:|:-:|:-:|---|
+| **fal-ai/flux-2/flash** | $0.005/MP | $0.004 | 5 | 5 | 5 | 5 | **5.0** | Flat front view, gold crimped ends, navy body, gold atom. **Picked.** |
+| fal-ai/flux/schnell | $0.003/MP | $0.0024 | 4 | 5 | 3 | 5 | 4.25 | Plain navy bag with no gold edges, on a black background. |
+| fal-ai/recraft/v3/text-to-image | $0.04/image | $0.04 | 4 | 1 | 4 | 1 | 2.5 | Angled photo. It printed "Rotom" on the pack, which is a Pokémon name: fails the text and brand checks. |
+| fal-ai/flux/dev | $0.025/MP | $0.02 | | | | | | Priced, not probed: 5x flash's price, and flash already scored 5. |
 
-## If a generated wrapper is wanted later
+**Rule:** a model at 10x the price needs at least +1.5 average points to win. flash was both the best and the second cheapest, so it was locked. Its probe image met every check, so no batch was needed: the probe image is the shipped art.
 
-1. Allow the fal.ai call for the session, then run the probe (2 or 3 models, about $0.01 to $0.05 total at 3:4) and record model, $/image, date and a 1 to 5 score in a table here.
-2. Save the pick as `img/pack.webp` (about 360x480, compressed) and set it as the background of `.pkart.lg`. Keep the CSS foil sheen on top.
-3. School filter: no text that has to be read, no brands, no real people.
+## Processing (local, free)
 
-Icon sizes: 84 WebP files at 128x128, 315 KB in total (the source PNGs are about 230 KB each). They are shown at 64 px, so 128 px stays sharp on 2x screens.
+- The border-connected navy background (RGB about 10, 20, 48) was made transparent with a flood fill. No AI background removal was used.
+- Cropped to the pack and resized to 440x712.
+- WebP at quality 84: **41 KB**. It is shown at up to 210 px wide, so 440 px stays sharp on 2x screens.
+
+## Spend
+
+| | Generations | Cost |
+|---|---:|---:|
+| Probes (3 models) | 3 | about $0.047 |
+| Batch | 0 | $0 |
+| **Total** | **3** | **about $0.047 of the $5 budget** |
+
+## Key handling
+
+The fal.ai key was passed only as an environment variable on each command line. The helper script contains no key; it reads `FAL_KEY` from the environment and redacts the key from any error it prints. The key is not in the repo, a commit, the PR, a screenshot, a log or a design doc, and the staged diff was scanned for it before committing. **Revoke the key.**
+
+## Icons (no fal spend)
+
+The 34 pack icons and 50 gold icons reuse the existing art in `design/icons/new`, `new2` and `rare` (PRs #12 to #14). They were resized to 128 px WebP in `img/icons/`: 84 files, 315 KB in total.

@@ -39,7 +39,7 @@ Each pack has 3 cards: a staple (a special finish on one of your cards, or XP), 
 
 Guests keep their packs, finishes and unlocked icons on the device (local storage), as with their cards. Signed-in students keep them on their account, and they merge across devices without duplicating a pack or losing an unlock.
 
-Art: the pack icons and gold icons reuse the existing icon art (`design/icons/`), resized into `img/icons/`. The pack wrapper is CSS. No fal.ai art was generated for packs (`design/pack-art.md`). The fal.ai key provided for this work was never written to the repository.
+Art: the pack icons and gold icons reuse the existing icon art (`design/icons/`), resized into `img/icons/`. The pack wrapper (`img/pack.webp`) was generated with fal.ai (`fal-ai/flux-2/flash`, about $0.05 including the model probe; see `design/pack-art.md`). The fal.ai key used for it was passed on the command line only and was never written to the repository.
 
 ## VS Arena (live multiplayer, 2 to 20 players)
 

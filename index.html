@@ -333,6 +333,10 @@ body.pkopen{overflow:hidden}
 .pkhint{margin:0;color:var(--mute);font-size:14px;text-align:center;min-height:1.4em}
 .pkart{position:relative;display:block;overflow:hidden;border-radius:10px;background:linear-gradient(160deg,#1d2870,#0b1030 55%,#161f58);box-shadow:inset 0 0 0 3px #f3dd7a,inset 0 0 0 6px #0b1030,inset 0 0 0 8px #a98d1a}
 .pkart.lg{width:min(220px,58vw);aspect-ratio:3/4}
+.pkart.pkimg{background:url(img/pack.webp) center/100% 100% no-repeat;box-shadow:none;border-radius:6px;aspect-ratio:440/712}
+.pkart.pkimg.lg{width:min(210px,52vw)}
+.pkart.pkimg.sm{width:30px;height:auto;box-shadow:none}
+.pkart.pkimg .pkfoil{-webkit-mask:url(img/pack.webp) center/100% 100%;mask:url(img/pack.webp) center/100% 100%}
 .pkart.sm{width:34px;height:46px;border-radius:5px;flex:none;box-shadow:inset 0 0 0 2px #f3dd7a}
 .pkart.card{width:100%;height:100%;border-radius:10px}
 .pkfoil{position:absolute;inset:0;background:linear-gradient(115deg,transparent 20%,rgba(243,221,122,.0) 30%,rgba(255,240,180,.55) 45%,rgba(127,209,240,.35) 55%,transparent 70%);background-size:260% 260%;animation:finsheen 3.8s linear infinite;mix-blend-mode:screen}
@@ -343,7 +347,7 @@ body.pkopen{overflow:hidden}
 .pkcrimp{position:absolute;left:0;right:0;height:10px;background:repeating-linear-gradient(90deg,#f3dd7a 0 6px,#a98d1a 6px 12px)}
 .pkcrimp.t{top:0}.pkcrimp.b{bottom:0}
 .pack{position:relative;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;filter:drop-shadow(0 18px 30px rgba(0,0,0,.5))}
-.pkstrip{position:absolute;left:0;right:0;top:0;height:16%;border-radius:10px 10px 0 0;background:repeating-linear-gradient(90deg,#f3dd7a 0 6px,#a98d1a 6px 12px);box-shadow:0 2px 0 rgba(0,0,0,.25);transition:transform .2s}
+.pkstrip{position:absolute;left:0;right:0;top:0;height:11%;background:url(img/pack.webp) top/100% auto no-repeat;transition:transform .2s}   /* the pack's own top crimp: dragging pulls it off */
 .pack.torn .pkstrip{animation:tearoff .45s cubic-bezier(.3,.6,.4,1) forwards}
 .pack.torn .pkart{animation:packpop .5s ease-out forwards}
 .pack.torn::after{content:'';position:absolute;inset:-30%;border-radius:50%;background:radial-gradient(circle,rgba(255,243,176,.95),rgba(243,221,122,0) 60%);animation:flash .5s ease-out forwards;pointer-events:none}
@@ -1272,7 +1276,10 @@ function binderHTML(){
 }
 /* Binder top: unopened packs, then the odds in plain numbers (straight from PACK_ODDS, so they cannot drift). */
 const packWhy=p=>p.reason==='vs'?'VS win':'Gold Legend: '+((BY[p.cardId]||{}).name||'a card');
-const packArt=sz=>'<span class="pkart '+sz+'" aria-hidden="true"><span class="pkfoil"></span><span class="pklogo">'+atomLogo+'</span><span class="pkname">ELEMENTAL<br>PACK</span><span class="pkcrimp t"></span><span class="pkcrimp b"></span></span>';
+// The pack itself (big and binder thumbnail) is generated art, img/pack.webp (design/pack-art.md) with a CSS sheen;
+// card backs keep the CSS foil design.
+const packArt=sz=>sz==='card'?'<span class="pkart card" aria-hidden="true"><span class="pkfoil"></span><span class="pklogo">'+atomLogo+'</span><span class="pkcrimp t"></span><span class="pkcrimp b"></span></span>'
+  :'<span class="pkart pkimg '+sz+'" aria-hidden="true"><span class="pkfoil"></span></span>';
 function packsHTML(){
   const n=S.packs.length;
   const list=n?'<div class="packrow">'+S.packs.map(p=>'<button class="minipack" data-act="pack-open" data-id="'+esc(p.id)+'">'+packArt('sm')+'<span>'+esc(packWhy(p))+'<b>Open</b></span></button>').join('')+'</div>':'';
