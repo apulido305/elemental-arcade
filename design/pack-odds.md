@@ -10,9 +10,10 @@ Packs are earned, never bought. There is no shop and no currency.
 |---|---|---|
 | VS Arena win | 1st place, with at least 2 players who answered at least one question | Once per match id. A rematch is a new match, so it can pay again. Reopening the result screen cannot. |
 | Gold Legend | The moment a card's correct-answer count first reaches 15 | Once per card, ever. Later correct answers on that card do not pay. |
+| Level up | Each level this game reaches through play (a round, a VS match, or XP from a pack). Levels are per game. | Once per level per game (`level:chem:5`), so Cell Arcade's level 5 is a separate pack. Several levels at once pay one pack each. XP set any other way pays nothing. |
 | Daily practice (signed in) | The first finished room round or VS match (any result) of the day, by the device's local date | Once per day (`day:YYYY-MM-DD`), synced across the student's devices. Signing in alone does not pay; a once-a-day pop-up at sign-in reminds them. Guests do not get it. |
 
-Each paid reason is recorded in `packLog` (`vs:CODE`, `gold:cardId`) when the pack is earned, so neither can double, even across devices.
+Each paid reason is recorded in `packLog` (`vs:CODE`, `gold:cardId`, `day:YYYY-MM-DD`, `level:gameId:N`) when the pack is earned, so none can double, even across devices.
 
 ## What is inside
 

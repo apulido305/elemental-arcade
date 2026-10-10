@@ -8,7 +8,8 @@ import { layoutProblems } from '../helpers/layout.js';
 // Guests keep packs in the shared Binder store ('arcade-v1'); packs, unlocks and finishes are account-wide (the profile).
 const guestProfile = p => p.evaluate(() => Binder.guestAll().profile);
 const SHOTS = '../docs/packs/';
-const packs = p => p.evaluate(() => Arcade.S.packs.map(x => x.id));
+// level-up packs ('level:chem:N') come with any XP; these tests are about the other reasons
+const packs = p => p.evaluate(() => Arcade.S.packs.map(x => x.id).filter(id => !id.startsWith('level:')));
 // Answer the current solo question correctly (or wrongly) through the real buttons.
 async function answerQ(p, right = true) {
   const i = await p.evaluate(r => { const q = Arcade.V.qs[Arcade.V.qi]; const k = q.opts.findIndex(o => o.ok); return r ? k : (k + 1) % q.opts.length; }, right);
@@ -77,6 +78,21 @@ test.describe('odds and the roller', () => {
 });
 
 test.describe('earning', () => {
+  test('each level this game reaches pays one pack, named for the game; never twice; setting XP directly pays nothing', async ({ arena }) => {
+    const dev = await arena.device({ firebase: 'blocked' }), p = dev.page;
+    await dev.goto('/');
+    const lv = () => p.evaluate(() => Arcade.S.packs.filter(x => x.reason === 'level').map(x => x.id));
+    expect(await p.evaluate(() => Arcade.gainXp(99))).toBe(0);                     // still Lv 1
+    expect(await p.evaluate(() => Arcade.gainXp(1))).toBe(1);                      // 100 XP: Lv 2
+    expect(await lv()).toEqual(['level:chem:2']);
+    expect(await p.evaluate(() => Arcade.S.packs[0])).toMatchObject({ reason: 'level', level: 2, game: 'chem' });
+    expect(await p.evaluate(() => Arcade.gainXp(500))).toBe(2);                    // 600 XP: Lv 4, two levels at once
+    expect(await lv()).toEqual(['level:chem:2', 'level:chem:3', 'level:chem:4']);
+    expect(await p.evaluate(() => Arcade.earnPack('level', 'chem:3'))).toBe(false);
+    await p.evaluate(() => { Arcade.S.xp = 495000; Arcade.save(); });               // a jump that skips gainXp
+    expect(await lv()).toHaveLength(3);
+  });
+
   test('crossing 15 on a card queues one pack; going to 16 does not; a normal tier-up and solo play do not', async ({ arena }) => {
     const dev = await arena.device({ firebase: 'blocked' }), p = dev.page;
     await dev.goto('/');
@@ -120,7 +136,7 @@ test.describe('earning', () => {
     expect(await packs(host.page)).toEqual(['vs:' + code, today]);
     // the pack reached the account (cloud save, the account-wide profile), and the rules accepted it
     const uid = await host.page.evaluate(() => Cloud.uid());
-    await expect.poll(() => (arena.backend.adminGet('players/' + uid).packs || []).map(x => x.id), { timeout: 8000 }).toEqual(['vs:' + code, today]);
+    await expect.poll(() => (arena.backend.adminGet('players/' + uid).packs || []).map(x => x.id).filter(id => !id.startsWith('level:')), { timeout: 8000 }).toEqual(['vs:' + code, today]);
     expect(arena.backend.adminGet('players/' + uid).packs.every(x => x.game === 'chem')).toBe(true);   // tagged with the game that rolled it
     expect(arena.backend.denials.filter(d => d.op !== 'get' && d.op !== 'list'), JSON.stringify(arena.backend.denials.slice(0, 2))).toEqual([]);
   });
@@ -221,7 +237,7 @@ test.describe('signed in: merge and rules', () => {
     expect(m.unlocked.sort()).toEqual(['cat', 'dog']);
     expect(m.finishes.h.sort()).toEqual(['foil', 'night']);
     expect(m.finishOn.h).toBe('night');                                            // this device's pick
-    expect(m.xp).toBe(80);
+    expect(m.xp).toBeUndefined();                                                 // XP is per game, not in the account half
     expect(m.packLog).toEqual(expect.arrayContaining(['open:gold:x', 'open:gold:y']));
   });
 
@@ -280,7 +296,7 @@ test.describe('daily pack', () => {
     expect(await packs(p)).toEqual([today]);                                           // one per day
     await expect(p.locator('[data-ui="pack-ready"]')).toHaveCount(0);
     await p.locator('.iconbtn[data-act="binder"]').click();
-    await expect(p.locator('[data-act="pack-open"]')).toContainText('Earned: daily practice');
+    await expect(p.locator('[data-act="pack-open"][data-id^="day:"]')).toContainText('Earned: daily practice');
     // the claim syncs: tomorrow on this account pays again, today on another device does not
     const uid = await p.evaluate(() => Cloud.uid());
     await expect.poll(() => (arena.backend.adminGet('players/' + uid).packLog || []).includes(today), { timeout: 8000 }).toBe(true);

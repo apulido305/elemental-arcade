@@ -61,13 +61,13 @@ test.describe('accounts', () => {
     expect(dev.errors).toEqual([]);
   });
 
-  test('an account made in Cell Arcade (Binder scheme) signs in here, with its XP and Cell Arcade icon', async ({ arena }) => {
+  test('an account made in Cell Arcade (Binder scheme) signs in here, with its Cell Arcade icon (its XP stays in Cell Arcade)', async ({ arena }) => {
     const { uid } = await cellAccount(arena, 'class2', 'bo', '1111', { owned: { 'bio:org1': 3 }, xp: 120, unlocked: ['bio:frog'] }, 'bio:frog');
     const dev = await arena.device({ width: PHONE }), p = dev.page;
     await dev.goto('/');
     await signInWithClass(dev, 'class2', 'bo', '1111');
     expect((await dev.currentUser()).uid).toBe(uid);
-    expect(await S(p, 'xp', 'icon', 'owned')).toEqual({ xp: 120, icon: 'bio:frog', owned: {} });   // no Elemental cards yet
+    expect(await S(p, 'xp', 'icon', 'owned')).toEqual({ xp: 0, icon: 'bio:frog', owned: {} });   // no Elemental cards or XP yet
     await expect(p.locator('[data-act="icons"] .av')).toHaveAttribute('data-icon', 'bio:frog');
     await expect.poll(() => arena.backend.adminGet('names/bo')).toMatchObject({ cls: 'class2', uid });   // the rules accept the Binder scheme's claim
     expect(arena.backend.denials).toEqual([]);
@@ -97,7 +97,8 @@ test.describe('accounts', () => {
     await dev.signUpViaUI('class1', 'dee', '2468');
     const u = await dev.currentUser();
     expect(u.email).toBe(B.accountEmail('class1', 'dee'));
-    expect(arena.backend.adminGet('players/' + u.uid)).toMatchObject({ nick: 'dee', cls: 'class1', level: 1, icon: 'atom' });
+    expect(arena.backend.adminGet('players/' + u.uid)).toMatchObject({ nick: 'dee', cls: 'class1', icon: 'atom' });
+    expect(arena.backend.adminGet('players/' + u.uid).xp).toBeUndefined();   // XP is per game
     expect(arena.backend.adminGet('players/' + u.uid).progress).toBeUndefined();
     expect(arena.backend.adminGet(`players/${u.uid}/games/chem`)).toMatchObject({ owned: {}, rounds: 0 });
     expect(arena.backend.adminGet('names/dee')).toMatchObject({ cls: 'class1', uid: u.uid });
@@ -110,7 +111,7 @@ test.describe('accounts', () => {
 });
 
 test.describe('saving through the Binder', () => {
-  test('after a round: cards in games/chem, XP and unlocks on the profile, the old progress map kept unchanged; games/bio never changes', async ({ arena }) => {
+  test('after a round: cards and XP in games/chem, unlocks on the profile, the old progress map kept unchanged; games/bio never changes', async ({ arena }) => {
     const { client, uid } = await legacyAccount(arena, 'class1', 'eve', '1234', { owned: { el1: 2 }, xp: 100, unlocked: ['cat'], packLog: ['vs:ABCDEF'] }, 'cat');
     // the same student played Cell Arcade too (its doc and a Cell Arcade unlock)
     await client.signIn('class1', 'eve').catch(() => {});                                 // Binder scheme: no such account
@@ -124,15 +125,15 @@ test.describe('saving through the Binder', () => {
     const dev = await arena.device({ width: DESKTOP }), p = dev.page;
     await dev.goto('/');
     await signInWithClass(dev, 'class1', 'eve', '1234');
-    expect(await S(p, 'xp', 'unlocked')).toEqual({ xp: 130, unlocked: ['cat', 'bio:frog'] });   // Cell Arcade's XP and unlock count here
+    expect(await S(p, 'xp', 'unlocked')).toEqual({ xp: 100, unlocked: ['cat', 'bio:frog'] });   // the old XP is Elemental's; Cell Arcade's unlock counts here, its XP does not
     await soloRound(p);
     await p.evaluate(() => Binder.flush());
     await expect.poll(() => arena.backend.adminGet(`players/${uid}/games/chem`)?.rounds, { timeout: 8000 }).toBe(1);
     const chem = arena.backend.adminGet(`players/${uid}/games/chem`), prof = arena.backend.adminGet('players/' + uid);
     expect(chem.owned.el1).toBeGreaterThanOrEqual(2);                                     // the old cards came along
     expect(Object.keys(chem.owned).length).toBeGreaterThan(1);
-    expect(prof.xp).toBeGreaterThan(130);
-    expect(prof.level).toBe(B.levelOf(prof.xp));
+    expect(chem.xp).toBeGreaterThan(100);                                                 // the old XP, then this round's
+    expect(prof.xp).toBeUndefined();                                                      // nothing written to the profile
     expect(prof.unlocked).toEqual(expect.arrayContaining(['cat', 'bio:frog']));
     expect(prof.icon).toBe('cat');
     // the pre-Binder map stays, frozen: never mirrored into, never dropped
@@ -298,7 +299,8 @@ test.describe('cards.json and guests', () => {
     expect(st.old).toBeNull();
     expect(st.all.games.chem).toMatchObject({ owned: { el1: 3 }, miss: { el2: 1 }, stars: { 'mixed|s20': 2 }, rounds: 2, best: 4 });
     expect(st.all.games.bio).toEqual({ owned: { 'bio:org1': 2 } });
-    expect(st.all.profile).toMatchObject({ xp: 60, icon: 'cat', packLog: ['vs:ZZZZZZ'] });
+    expect(st.all.profile).toMatchObject({ icon: 'cat', packLog: ['vs:ZZZZZZ'] });
+    expect(st.all.games.chem.xp).toBe(60);                                                 // this game's own XP
     expect(st.all.profile.unlocked.sort()).toEqual(['bio:frog', 'cat']);
     expect(st.prefs).toEqual({ mute: true, deck: 'r4', room: 'symbol', qn: 15 });
     expect([st.deck, st.qn]).toEqual(['r4', 15]);
@@ -306,7 +308,8 @@ test.describe('cards.json and guests', () => {
     await dev.signUpViaUI('class1', 'ivy', '1234');
     const uid = (await dev.currentUser()).uid;
     expect(arena.backend.adminGet(`players/${uid}/games/chem`).owned).toEqual({ el1: 3 });
-    expect(arena.backend.adminGet('players/' + uid)).toMatchObject({ xp: 60, icon: 'cat' });
+    expect(arena.backend.adminGet('players/' + uid)).toMatchObject({ icon: 'cat' });
+    expect(arena.backend.adminGet(`players/${uid}/games/chem`).xp).toBe(60);
     expect(arena.backend.adminGet('players/' + uid).unlocked.sort()).toEqual(['bio:frog', 'cat']);
     const left = await p.evaluate(() => Binder.guestAll());
     expect(left.games.chem).toBeUndefined();
@@ -357,7 +360,8 @@ test.describe('sign-up never makes a duplicate; guest saves merge across games',
     await p.evaluate(() => { Arcade.S.xp = 70; Arcade.S.unlocked = ['cat']; Arcade.save(); });
     await p.evaluate(() => Binder.guestSave('bio', { owned: { 'bio:org1': 1 }, xp: 30, unlocked: ['bio:frog'], packLog: ['day:2026-10-10'] }, null));   // a stale tab
     const g = await p.evaluate(() => Binder.guestAll());
-    expect(g.profile.xp).toBe(70);
+    expect(g.games.chem.xp).toBe(70);                                                     // XP is per game: each keeps its own
+    expect(g.games.bio.xp).toBe(30);
     expect(g.profile.unlocked.sort()).toEqual(['bio:frog', 'cat']);
     expect(g.profile.packLog).toEqual(['day:2026-10-10']);
     expect(g.games.bio.owned).toEqual({ 'bio:org1': 1 });
