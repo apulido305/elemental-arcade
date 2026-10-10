@@ -19,15 +19,17 @@ createRequire(import.meta.url)('../../binder.js');   // icon ids and games come 
 const B = globalThis.Binder;
 
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-export const GAME_IDS = ['chem', 'bio'];
+export const GAME_IDS = ['chem', 'bio', 'space'];
 // VS decks and rooms per game (rules: deckRoomOk). A match without 'game' is a pre-Binder Elemental match: 'chem'.
 export const DECKS_BY_GAME = {
   chem: ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all'],
-  bio: ['s20', 'cell', 'aa', 'tree', 'body', 'eco', 'all']
+  bio: ['s20', 'cell', 'aa', 'tree', 'body', 'eco', 'all'],
+  space: ['s20', 'wx', 'rocks', 'solar', 'stars', 'explore', 'all']
 };
 export const ROOMS_BY_GAME = {
   chem: ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed'],
-  bio: ['function', 'code', 'codon', 'tree', 'kingdom', 'cellmap', 'plant', 'body', 'mixed']
+  bio: ['function', 'code', 'codon', 'tree', 'kingdom', 'cellmap', 'plant', 'body', 'mixed'],
+  space: ['clue', 'code', 'order', 'solarmap', 'sort', 'layermap', 'rockgas', 'why', 'mixed']
 };
 export const DECK_IDS = DECKS_BY_GAME.chem, ROOM_IDS = ROOMS_BY_GAME.chem;   // this game's
 export const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];

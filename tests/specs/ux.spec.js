@@ -28,8 +28,9 @@ for (const w of [PHONE, DESKTOP]) {
     await expect(p.locator('[data-act="mute"]')).toHaveAttribute('aria-label', 'Sound on');
     await expect(p.locator('[data-act="icons"]')).toHaveAttribute('aria-label', 'Change profile icon');
     await expect(p.locator('[data-ui="site-link"] a').first()).toHaveAttribute('href', 'https://mrpulido.com');
-    await expect(p.locator('[data-ui="game-link"]')).toHaveText('Play Cell Arcade →');
-    await expect(p.locator('[data-ui="game-link"]')).toHaveAttribute('href', 'https://apulido305.github.io/cell-arcade/');
+    await expect(p.locator('[data-ui="game-link"]')).toHaveText(['Play Cell Arcade →', 'Play Space Arcade →']);   // the other games in the Binder
+    await expect(p.locator('[data-ui="game-link"]').first()).toHaveAttribute('href', 'https://apulido305.github.io/cell-arcade/');
+    await expect(p.locator('[data-ui="game-link"]').nth(1)).toHaveAttribute('href', 'https://apulido305.github.io/astrological/');
     expect(await layoutProblems(p)).toEqual([]);
     const m = await p.evaluate(() => ({ header: document.querySelector('.top').getBoundingClientRect().height, page: document.documentElement.scrollHeight }));
     if (w === PHONE) expect(m.header).toBeLessThanOrEqual(120);

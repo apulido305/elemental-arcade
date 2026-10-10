@@ -15,7 +15,7 @@
    It does not import Firebase: cloud.js loads the SDK and hands it over with Binder.init({F, db}). */
 (function (root) {
   'use strict';
-  const BINDER_VERSION = 6;
+  const BINDER_VERSION = 7;
 
   // ---------- registry ----------
   // id: short game id, also the card-id prefix ('bio:org3') and the icon-id prefix ('bio:frog').
@@ -27,7 +27,10 @@
       cats: [['el', 'Elements'], ['cat', 'Cations'], ['an', 'Anions'], ['poly', 'Polyatomic'], ['iso', 'Isotopes']] },
     bio: { id: 'bio', title: 'Cell Arcade', short: 'Cell', subject: 'Biology', color: '#5fd38a',
       url: 'https://apulido305.github.io/cell-arcade/',
-      cats: [['org', 'Cell Parts'], ['mol', 'Biomolecules'], ['aa', 'Amino Acids'], ['life', 'Tree of Life'], ['sys', 'Human Body'], ['eco', 'Ecology']] }
+      cats: [['org', 'Cell Parts'], ['mol', 'Biomolecules'], ['aa', 'Amino Acids'], ['life', 'Tree of Life'], ['sys', 'Human Body'], ['eco', 'Ecology']] },
+    space: { id: 'space', title: 'Space Arcade', short: 'Space', subject: 'Earth & Space Science', color: '#9b8cff',
+      url: 'https://apulido305.github.io/astrological/',
+      cats: [['wx', 'Weather'], ['clm', 'Climate'], ['geo', 'Rocks & Plates'], ['era', 'Deep Time'], ['sol', 'Solar System'], ['sky', 'Sky'], ['star', 'Stars'], ['cos', 'Cosmos'], ['tech', 'Exploration']] }
   };
   Object.keys(GAMES).forEach(k => { GAMES[k].cardsUrl = GAMES[k].url + 'cards.json'; });
   let CURRENT = null;
@@ -65,6 +68,15 @@
         ['bio:jellyfish', 'Jellyfish', 1], ['bio:octopus', 'Octopus', 1], ['bio:chameleon', 'Chameleon', 1], ['bio:koala', 'Koala', 1], ['bio:sloth', 'Sloth', 1], ['bio:hummingbird', 'Hummingbird', 1], ['bio:seahorse', 'Seahorse', 1], ['bio:mantis', 'Mantis', 1], ['bio:flytrap', 'Flytrap', 1], ['bio:coral', 'Coral', 1],
         ['bio:tardigrade', 'Tardigrade', 2], ['bio:narwhal', 'Narwhal', 2], ['bio:whale', 'Whale', 2], ['bio:peacock', 'Peacock', 2], ['bio:firefly', 'Firefly', 2], ['bio:anglerfish', 'Anglerfish', 2],
         ['bio:mammoth', 'Mammoth', 3], ['bio:megalodon', 'Megalodon', 3]]
+    },
+    space: {
+      free: [['space:rocket', 'Rocket'], ['space:comet', 'Comet'], ['space:ringed', 'Ringed Planet'], ['space:crescent', 'Crescent Moon'], ['space:telescope', 'Telescope'], ['space:satellite', 'Satellite'], ['space:helmet', 'Space Helmet'], ['space:rover', 'Rover'],
+        ['space:sun', 'Sun'], ['space:earth', 'Earth'], ['space:cloud', 'Cloud'], ['space:geode', 'Geode'], ['space:snowflake', 'Snowflake'], ['space:lightning', 'Lightning'], ['space:fossil', 'Fossil'], ['space:compass', 'Compass']],
+      pack: [['space:asteroid', 'Asteroid', 0], ['space:meteor', 'Meteor', 0], ['space:crater', 'Crater', 0], ['space:nebula', 'Nebula', 0], ['space:aurora', 'Aurora', 0], ['space:tornado', 'Tornado', 0], ['space:umbrella', 'Umbrella', 0], ['space:thermometer', 'Thermometer', 0],
+        ['space:mountain', 'Mountain', 0], ['space:iceberg', 'Iceberg', 0], ['space:hammer', 'Rock Hammer', 0], ['space:windsock', 'Windsock', 0], ['space:starmap', 'Star Map', 0], ['space:raindrop', 'Raindrop', 0], ['space:crystal', 'Crystal', 0], ['space:cluster', 'Star Cluster', 0],
+        ['space:lander', 'Lander', 1], ['space:probe', 'Space Probe', 1], ['space:station', 'Space Station', 1], ['space:spaceplane', 'Spaceplane', 1], ['space:observatory', 'Observatory', 1], ['space:volcano', 'Volcano', 1], ['space:geyser', 'Geyser', 1], ['space:hurricane', 'Hurricane', 1],
+        ['space:trilobite', 'Trilobite', 1], ['space:eclipse', 'Eclipse', 1], ['space:blackhole', 'Black Hole', 2], ['space:pulsar', 'Pulsar', 2], ['space:supernova', 'Supernova', 2], ['space:spiral', 'Spiral Galaxy', 2], ['space:bluegiant', 'Blue Giant', 2], ['space:icemoon', 'Ice Moon', 2],
+        ['space:heartworld', 'Heart World', 3], ['space:goldenrecord', 'Golden Record', 3]]
     }
   };
   const FREE_ICONS = [], PACK_ICONS = [], ICON_META = {};

@@ -79,7 +79,7 @@ test.describe('accounts', () => {
     const dev = await arena.device({ width: PHONE }), p = dev.page;
     await dev.goto('/');
     await p.click('[data-act="account"]');
-    await expect(p.locator('[data-ui="every-game"]')).toContainText('One account works in every arcade game: Elemental Arcade and Cell Arcade.');
+    await expect(p.locator('[data-ui="every-game"]')).toContainText('One account works in every arcade game: Elemental Arcade, Cell Arcade and Space Arcade.');
     await p.click('[data-act="authtab"][data-id="up"]');
     await p.fill('#f-cls', 'class1'); await p.fill('#f-nick', 'cy'); await p.fill('#f-pin', '5555');
     await p.click('#authform button[type="submit"]');
