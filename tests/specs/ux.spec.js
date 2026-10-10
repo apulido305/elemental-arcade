@@ -69,7 +69,7 @@ test('locked rooms: last, flat, aria-disabled; a tap says why and starts nothing
   expect(await p.evaluate(() => Arcade.V.screen)).toBe('home');
   await shot(p, 'locked-room', PHONE);
   const mixedBand = await p.locator('[data-act="room"][data-id="mixed"] .band').evaluate(e => getComputedStyle(e).backgroundImage);
-  expect(mixedBand).toContain('243, 221, 122');                                  // gold
+  expect(mixedBand).toContain('245, 158, 11');                                   // catalytic gold
   // Cations: the rooms that need element cards lock (Number Crunch, Table Map, Ion Maker, Metal Detector) and so does the Review Room (no misses yet); Particle Lab opens
   await p.locator('[data-act="deck"][data-id="cat"]').click();
   await expect(p.locator('[data-ui="room-status"]')).toHaveText('');            // deck change clears the message

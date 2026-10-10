@@ -101,38 +101,38 @@ const codeHTML = c => esc(String(c).slice(0, 3)) + '<span class="g2">' + esc(Str
 
 /* ---------- styles ---------- */
 const CSS = `
-#vs{position:fixed;inset:0;z-index:40;overflow-y:auto;overflow-x:hidden;background:radial-gradient(120% 520px at 50% 0,#26358f,rgba(11,16,48,0) 75%),var(--bg0);color:var(--text);-webkit-overflow-scrolling:touch}
+#vs{position:fixed;inset:0;z-index:40;overflow-y:auto;overflow-x:hidden;background:var(--void);color:var(--text);-webkit-overflow-scrolling:touch}
 #vs[hidden]{display:none}
 #vs .vs-wrap{max-width:1040px;margin:0 auto;padding:14px 16px 56px}
 #vs .vs-top{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:14px}
-#vs .vs-title{font:400 30px/1 var(--display);letter-spacing:2px;color:var(--gold)}
-#vs .vs-panel{background:var(--panel);border:2px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 6px 0 var(--shadow);margin-bottom:16px;min-width:0}
-#vs .vs-panel h2{font:400 22px/1.1 var(--display);color:#fff;letter-spacing:.4px;margin:0 0 10px}
+#vs .vs-title{font:700 30px/1 var(--display);letter-spacing:2px;color:var(--cyan);text-shadow:0 0 18px rgba(0,245,255,.45)}
+#vs .vs-panel{background:var(--panel);border:2px solid var(--line);border-radius:4px;padding:18px;box-shadow:var(--lift);margin-bottom:16px;min-width:0}
+#vs .vs-panel h2{font:700 22px/1.1 var(--display);color:#fff;letter-spacing:.4px;margin:0 0 10px}
 #vs .vs-sub{color:var(--mute);margin:4px 0 0;font-size:15px}
 #vs .vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 #vs .vs-row2{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 #vs .vs-f{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 150px}
-#vs .vs-f>label,#vs .vs-lab{font:700 12px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;color:var(--gold)}
-#vs input[type=text],#vs input[type=number],#vs select{width:100%;min-height:48px;padding:8px 12px;border-radius:12px;border:2px solid var(--line);background:var(--bg0);color:var(--text);font:400 18px/1.2 var(--body)}
+#vs .vs-f>label,#vs .vs-lab{font:500 12px/1 var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--cyan)}
+#vs input[type=text],#vs input[type=number],#vs select{width:100%;min-height:48px;padding:8px 12px;border-radius:4px;border:2px solid var(--line);background:var(--bg0);color:var(--text);font:400 18px/1.2 var(--body)}
 #vs input.vs-codein{font:500 28px/1.2 var(--mono);letter-spacing:6px;text-transform:uppercase;text-align:center}
-#vs input:focus,#vs select:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(243,221,122,.3)}
+#vs input:focus,#vs select:focus{border-color:var(--cyan);outline:none;box-shadow:0 0 0 3px rgba(0,245,255,.25)}
 #vs .vs-chk{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font-size:16px}
-#vs .vs-chk input{width:22px;height:22px;accent-color:#f3dd7a;flex:none}
+#vs .vs-chk input{width:22px;height:22px;accent-color:#00f5ff;flex:none}
 #vs .btn{min-height:48px}
 #vs .btn[disabled]{opacity:.55;cursor:default}
-#vs .vs-err{margin:0 0 14px;padding:10px 14px;border-radius:12px;background:rgba(217,83,79,.16);border:2px solid var(--bad);color:#fff}
+#vs .vs-err{margin:0 0 14px;padding:10px 14px;border-radius:4px;background:rgba(217,83,79,.16);border:2px solid var(--bad);color:#fff}
 #vs .vs-err[hidden]{display:none}
-#vs .vs-gname b{font:400 24px/1.1 var(--display);color:var(--cream);letter-spacing:.5px}
-#vs .vs-tag{display:inline-block;font:700 10px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;padding:3px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);margin-left:6px;vertical-align:middle}
+#vs .vs-gname b{font:700 24px/1.1 var(--display);color:var(--cream);letter-spacing:.5px}
+#vs .vs-tag{display:inline-block;font:500 10px/1 var(--mono);letter-spacing:.8px;text-transform:uppercase;padding:3px 6px;border-radius:3px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);margin-left:6px;vertical-align:middle}
 #vs .vs-lobbylist{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-#vs .vs-lobbyrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;background:var(--panel2);border:2px solid var(--line);border-radius:14px;padding:10px 14px}
-#vs .vs-lobbyrow b{font:400 19px/1.1 var(--display);color:var(--cream)}
+#vs .vs-lobbyrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between;background:var(--panel2);border:2px solid var(--line);border-radius:4px;padding:10px 14px}
+#vs .vs-lobbyrow b{font:700 19px/1.1 var(--display);color:var(--cream)}
 #vs .vs-lobbyrow small{display:block;color:var(--mute);font-size:13px}
-#vs .vs-bigcode{font:500 clamp(44px,13vw,84px)/1 var(--mono);letter-spacing:.12em;color:var(--gold);text-align:center;margin:6px 0;user-select:all;text-shadow:0 0 22px rgba(243,221,122,.3)}
+#vs .vs-bigcode{font:500 clamp(44px,13vw,84px)/1 var(--mono);letter-spacing:.12em;color:var(--cyan);text-align:center;margin:6px 0;user-select:all;text-shadow:0 0 22px rgba(0,245,255,.45)}
 #vs .vs-center{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
 #vs .vs-plist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;list-style:none;margin:10px 0 0;padding:0}
-#vs .vs-plist li{display:flex;align-items:center;gap:8px;min-width:0;min-height:44px;padding:6px 10px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);font:400 18px/1.1 var(--display);animation:fadeIn .12s backwards}
-#vs .vs-plist li.host{border-color:var(--gold)}
+#vs .vs-plist li{display:flex;align-items:center;gap:8px;min-width:0;min-height:44px;padding:6px 10px;border-radius:4px;background:var(--panel2);border:2px solid var(--line);font:700 18px/1.1 var(--display);animation:fadeIn .12s backwards}
+#vs .vs-plist li.host{border-color:var(--cyan)}
 #vs .vs-plist .who{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 #vs .vs-plist .nm{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vs .vs-plist .tags{display:flex;gap:4px}
@@ -140,12 +140,12 @@ const CSS = `
 @media (min-width:900px){#vs .vs-plist{grid-template-columns:repeat(4,minmax(0,1fr))}}
 #vs .vs-gname{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:44px}
 #vs .vs-gname .nmw{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 180px}
-#vs .vs-picker{margin-top:12px;padding:12px;border-radius:14px;background:var(--bg0);border:2px solid var(--line)}
+#vs .vs-picker{margin-top:12px;padding:12px;border-radius:4px;background:var(--bg0);border:2px solid var(--line)}
 #vs .vs-picker .icell{background:var(--panel)}
 #vs .vs-picker .vs-center{margin-top:12px;justify-content:flex-end}
-#vs details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;list-style:none;font:400 22px/1.1 var(--display);color:#fff}
+#vs details>summary{display:flex;align-items:center;min-height:44px;cursor:pointer;list-style:none;font:700 22px/1.1 var(--display);color:#fff}
 #vs details>summary::-webkit-details-marker{display:none}
-#vs details>summary::after{content:'+';margin-left:auto;font:700 22px/1 var(--body);color:var(--gold)}
+#vs details>summary::after{content:'+';margin-left:auto;font:700 22px/1 var(--body);color:var(--cyan)}
 #vs details[open]>summary::after{content:'−'}
 #vs details[open]>summary{margin-bottom:10px}
 #vs .vs-bigcode{font-variant-ligatures:none;white-space:nowrap}
@@ -164,18 +164,18 @@ const CSS = `
   #vs .btn.small{min-height:44px}
 }
 #vs .vs-hud{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-#vs .vs-rankchip{min-width:64px;text-align:center;padding:8px 14px;border-radius:999px;background:var(--gold);color:#241c00;font:400 22px/1 var(--display)}
+#vs .vs-rankchip{min-width:64px;text-align:center;padding:8px 14px;border-radius:4px;background:var(--gold);color:#0a0d20;font:700 22px/1 var(--display)}
 #vs .vs-timer{position:relative;width:64px;height:64px;flex:none}
 #vs .vs-timer svg{width:64px;height:64px;transform:rotate(-90deg)}
 #vs .vs-timer circle{fill:none;stroke-width:6}
 #vs .vs-timer .bg{stroke:var(--line)}
-#vs .vs-timer .fg{stroke:var(--gold);stroke-linecap:round;stroke-dasharray:138.2;transition:stroke-dashoffset .12s linear,stroke .2s}
+#vs .vs-timer .fg{stroke:var(--cyan);stroke-linecap:round;stroke-dasharray:138.2;transition:stroke-dashoffset .12s linear,stroke .2s}
 #vs .vs-timer.low .fg{stroke:var(--bad)}
-#vs .vs-timer.rev .fg{stroke:var(--sky)}
-#vs .vs-timer b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 22px/1 var(--display);color:#fff}
+#vs .vs-timer.rev .fg{stroke:var(--violetl)}
+#vs .vs-timer b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 22px/1 var(--display);color:#fff}
 #vs .vs-score{text-align:right}
 #vs .vs-score small{display:block;font:700 11px/1 var(--body);letter-spacing:1px;text-transform:uppercase;color:var(--mute)}
-#vs .vs-score b{font:400 30px/1.1 var(--display);color:var(--gold)}
+#vs .vs-score b{font:700 30px/1.1 var(--display);color:var(--gold)}
 #vs .vs-meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font:700 13px/1.2 var(--body);letter-spacing:.8px;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
 #vs .vs-play{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 #vs .vs-stage{min-width:0}
@@ -183,61 +183,61 @@ const CSS = `
 #vs .vs-stage .opt.sel{outline:4px solid var(--sky);outline-offset:-2px}
 #vs .vs-stage .opts.locked .opt{cursor:default}
 #vs .vs-lock{margin-top:14px;color:var(--sky);font:700 15px/1.3 var(--body)}
-#vs .vs-reveal{margin-top:16px;border-radius:16px;padding:14px;border:2px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;animation:rise .3s backwards}
+#vs .vs-reveal{margin-top:16px;border-radius:4px;padding:14px;border:2px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;animation:rise .3s backwards}
 #vs .vs-reveal.ok{background:rgba(76,175,98,.14);border-color:var(--good)}
 #vs .vs-reveal.no{background:rgba(217,83,79,.14);border-color:var(--bad)}
-#vs .vs-reveal h3{font:400 26px/1.1 var(--display);color:#fff;margin:0 0 6px}
+#vs .vs-reveal h3{font:700 26px/1.1 var(--display);color:#fff;margin:0 0 6px}
 #vs .vs-reveal .t{flex:1 1 240px;min-width:0}
 #vs .vs-reveal p{margin:6px 0}
-#vs .vs-pill{display:inline-block;background:var(--gold);color:#241c00;border-radius:8px;padding:5px 10px;font:700 13px/1 var(--body);letter-spacing:.6px;margin:4px 6px 0 0}
+#vs .vs-pill{display:inline-block;background:var(--gold);color:#0a0d20;border-radius:4px;padding:5px 10px;font:700 13px/1 var(--body);letter-spacing:.6px;margin:4px 6px 0 0}
 #vs .vs-ladder{list-style:none;margin:0;padding:0;display:grid;gap:6px;position:relative}
-#vs .vs-lrow{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:12px;background:var(--panel2);border:2px solid var(--line);min-width:0}
-#vs .vs-lrow.me{border-color:var(--gold);background:#26358f}
+#vs .vs-lrow{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:4px;background:var(--panel2);border:2px solid var(--line);min-width:0}
+#vs .vs-lrow.me{border-color:var(--cyan);background:#24164a;box-shadow:0 0 14px -4px rgba(0,245,255,.5)}
 #vs .vs-lrow.away{opacity:.55}
-#vs .vs-lrow .rk{flex:none;width:30px;font:400 18px/1 var(--display);color:var(--gold);text-align:center}
+#vs .vs-lrow .rk{flex:none;width:30px;font:700 18px/1 var(--display);color:var(--gold);text-align:center}
 #vs .vs-lrow .nm{flex:1 1 auto;min-width:0;font:700 16px/1.1 var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vs .vs-lrow .st{flex:none;font:700 12px/1 var(--body);color:var(--mute)}
 #vs .vs-lrow .st.done{color:var(--good)}
-#vs .vs-lrow .sc{flex:none;min-width:48px;text-align:right;font:400 20px/1 var(--display);color:#fff}
-#vs .vs-lrow .dl{flex:none;font:700 12px/1 var(--body);padding:3px 6px;border-radius:6px}
+#vs .vs-lrow .sc{flex:none;min-width:48px;text-align:right;font:700 20px/1 var(--display);color:#fff}
+#vs .vs-lrow .dl{flex:none;font:700 12px/1 var(--body);padding:3px 6px;border-radius:3px}
 #vs .vs-lrow .dl.up{background:var(--good);color:#fff}
 #vs .vs-lrow .dl.dn{background:var(--bad);color:#fff}
-#vs .vs-react{flex:none;font:700 12px/1 var(--body);padding:4px 8px;border-radius:999px;background:var(--cream);color:#14194a;animation:vsPop .3s backwards}
+#vs .vs-react{flex:none;font:700 12px/1 var(--body);padding:4px 8px;border-radius:4px;background:var(--cream);color:#0a0d20;animation:vsPop .3s backwards}
 #vs .vs-flame{flex:none;width:16px;height:20px;fill:#ff8a24;filter:drop-shadow(0 0 4px rgba(255,138,36,.7))}
 #vs .vs-more{width:100%;margin-top:8px}
 #vs .vs-reacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-#vs .vs-reacts button{min-height:44px;min-width:56px;padding:6px 12px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);cursor:pointer;font:700 15px/1 var(--body)}
+#vs .vs-reacts button{min-height:44px;min-width:56px;padding:6px 12px;border-radius:4px;border:2px solid var(--line);background:var(--panel2);cursor:pointer;font:700 15px/1 var(--body)}
 #vs .vs-reacts button.cool{opacity:.5}
-#vs .vs-splash{position:relative;min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;overflow:hidden;border-radius:20px;background:linear-gradient(180deg,#1d2870,#0b1030);border:2px solid var(--line);padding:18px}
+#vs .vs-splash{position:relative;min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;overflow:hidden;border-radius:4px;background:linear-gradient(180deg,#171a2e,#0a0d20);border:2px solid var(--line);padding:18px}
 #vs .vs-duel{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;width:100%}
-#vs .vs-plate{padding:16px 10px;border-radius:14px;background:var(--panel2);border:3px solid var(--sky);font:400 clamp(20px,6vw,38px)/1.1 var(--display);color:#fff;overflow-wrap:anywhere}
-#vs .vs-plate.r{border-color:var(--rose);animation:vsFromR .5s cubic-bezier(.2,.9,.3,1) backwards}
+#vs .vs-plate{padding:16px 10px;border-radius:4px;background:var(--panel2);border:1px solid var(--sky);box-shadow:0 0 18px -6px rgba(0,245,255,.7);font:700 clamp(20px,6vw,38px)/1.1 var(--display);color:#fff;overflow-wrap:anywhere}
+#vs .vs-plate.r{border-color:var(--pink);box-shadow:0 0 18px -6px rgba(255,0,122,.7);animation:vsFromR .5s cubic-bezier(.2,.9,.3,1) backwards}
 #vs .vs-plate.l{animation:vsFromL .5s cubic-bezier(.2,.9,.3,1) backwards}
 #vs .vs-plate small{display:block;font:700 12px/1.2 var(--body);letter-spacing:1px;color:var(--mute);margin-top:4px}
-#vs .vs-vs{font:400 clamp(54px,16vw,120px)/1 var(--display);color:var(--gold);text-shadow:0 4px 0 var(--goldd),0 0 30px rgba(243,221,122,.6);animation:vsSlam .5s .5s cubic-bezier(.2,.9,.3,1.2) backwards}
-#vs .vs-arena-word{font:400 clamp(48px,14vw,104px)/1 var(--display);color:var(--gold);letter-spacing:6px;text-shadow:0 4px 0 var(--goldd),0 0 30px rgba(243,221,122,.6);animation:vsSlam .5s .6s cubic-bezier(.2,.9,.3,1.2) backwards}
+#vs .vs-vs{font:700 clamp(54px,16vw,120px)/1 var(--display);color:var(--pink);text-shadow:0 0 2px #fff,0 0 28px rgba(255,0,122,.8);animation:vsSlam .5s .5s cubic-bezier(.2,.9,.3,1.2) backwards}
+#vs .vs-arena-word{font:700 clamp(48px,14vw,104px)/1 var(--display);color:var(--cyan);letter-spacing:6px;text-shadow:0 0 2px #fff,0 0 30px rgba(0,245,255,.7);animation:vsSlam .5s .6s cubic-bezier(.2,.9,.3,1.2) backwards}
 #vs .vs-plates{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 #vs .vs-plates .vs-plate{font-size:18px;padding:8px 12px;animation:vsDeal .4s backwards;border-color:var(--sky)}
-#vs .vs-cd{font:400 clamp(80px,26vw,160px)/1 var(--display);color:#fff;text-shadow:0 0 30px rgba(127,209,240,.7);animation:vsPop .4s}
+#vs .vs-cd{font:700 clamp(80px,26vw,160px)/1 var(--display);color:#fff;text-shadow:0 0 30px rgba(0,245,255,.7);animation:vsPop .4s}
 #vs .vs-cd[hidden]{display:none}
 #vs .vs-codeline{font:500 20px/1 var(--mono);color:var(--mute);letter-spacing:4px}
 #vs .vs-podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:12px 0 4px}
-#vs .vs-pod{flex:1 1 0;max-width:200px;min-width:0;text-align:center;border-radius:14px 14px 0 0;padding:10px 6px;background:var(--panel2);border:2px solid var(--line);border-bottom:0;animation:rise .5s backwards}
-#vs .vs-pod.p1{background:linear-gradient(180deg,#fff3b0,#e0b81a);color:#241c00;min-height:150px;border-color:var(--gold)}
+#vs .vs-pod{flex:1 1 0;max-width:200px;min-width:0;text-align:center;border-radius:4px 4px 0 0;padding:10px 6px;background:var(--panel2);border:2px solid var(--line);border-bottom:0;animation:rise .5s backwards}
+#vs .vs-pod.p1{background:linear-gradient(180deg,#fde68a,#f59e0b);color:#0a0d20;min-height:150px;border-color:var(--gold)}
 #vs .vs-pod.p2{min-height:116px}
 #vs .vs-pod.p3{min-height:92px}
-#vs .vs-pod .n{font:400 26px/1 var(--display)}
+#vs .vs-pod .n{font:700 26px/1 var(--display)}
 #vs .vs-pod .nm{font:700 16px/1.15 var(--body);overflow-wrap:anywhere;margin:4px 0}
-#vs .vs-pod .sc{font:400 22px/1 var(--display)}
+#vs .vs-pod .sc{font:700 22px/1 var(--display)}
 #vs .vs-pod.me{outline:3px solid var(--sky)}
 #vs table.vs-tbl{width:100%;border-collapse:collapse;font-size:15px}
-#vs .vs-tbl th{font:700 11px/1 var(--body);letter-spacing:.8px;text-transform:uppercase;color:var(--gold);text-align:left;padding:6px 6px}
+#vs .vs-tbl th{font:500 11px/1 var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--cyan);text-align:left;padding:6px 6px}
 #vs .vs-tbl td{padding:8px 6px;border-top:1px solid var(--line)}
-#vs .vs-tbl tr.me td{background:rgba(243,221,122,.12);font-weight:700}
+#vs .vs-tbl tr.me td{background:rgba(0,245,255,.08);font-weight:700}
 #vs .vs-tbl .r{text-align:right}
 #vs .vs-ok{color:var(--good);font-weight:700}
 #vs .vs-no{color:var(--rose);font-weight:700}
-#vs .vs-banner{background:linear-gradient(90deg,#26358f,#1d2870);border:3px solid var(--gold);border-radius:16px;padding:14px;margin-bottom:16px;text-align:center;animation:rise .35s backwards}
+#vs .vs-banner{background:linear-gradient(90deg,#24164a,#171a2e);border:1px solid var(--cyan);box-shadow:var(--glow-c);border-radius:4px;padding:14px;margin-bottom:16px;text-align:center;animation:rise .35s backwards}
 #vs .vs-banner .vs-bigcode{font-size:clamp(36px,10vw,64px)}
 @keyframes vsFromL{from{transform:translateX(-140%);opacity:0}to{transform:none;opacity:1}}
 @keyframes vsFromR{from{transform:translateX(140%);opacity:0}to{transform:none;opacity:1}}
@@ -943,7 +943,7 @@ function renderStage() {
   if (ph.name === 'question') {
     const done = !!a;
     const opts = q.options.map((o, i) => '<button class="opt' + (q.mono ? ' mono' : '') + (done && a.choice === i ? ' sel' : '') + '" data-vs="opt" data-i="' + i + '"' + (done ? ' disabled' : '') + '><span class="key">' + (i + 1) + '</span><span class="ot">' + o + '</span></button>').join('');
-    el.innerHTML = '<div class="vs-panel"><div class="qmeta">' + esc(roomName()) + '</div><h2 class="prompt" data-vs="question" style="font:400 clamp(22px,4vw,32px)/1.12 var(--display)">' + q.prompt + '</h2><div class="clue">' + q.clue + '</div>' +
+    el.innerHTML = '<div class="vs-panel"><div class="qmeta">' + esc(roomName()) + '</div><h2 class="prompt" data-vs="question" style="font:700 clamp(22px,4vw,32px)/1.12 var(--display)">' + q.prompt + '</h2><div class="clue">' + q.clue + '</div>' +
       '<div class="opts' + (done ? ' locked' : '') + '">' + opts + '</div>' + (done ? '<div class="vs-lock">Locked in. Waiting for the reveal...</div>' : '') + '</div>';
   } else {
     const info = (R.reveals && R.reveals[idx]) || {};
@@ -952,7 +952,7 @@ function renderStage() {
     const item = Arc.BY[q.cardId];
     const head = ok ? 'Correct! +' + a.points + ' pts' : a ? 'Not quite' : 'Time is up';
     const pills = (info.isNew ? '<span class="vs-pill">NEW CARD: ' + esc(item && item.name) + '</span>' : '') + (info.up >= 0 ? '<span class="vs-pill">CARD LEVEL UP: ' + esc(Arc.TIERS[info.up].n.toUpperCase()) + '</span>' : '');
-    el.innerHTML = '<div class="vs-panel"><div class="qmeta">' + esc(roomName()) + '</div><h2 class="prompt" style="font:400 clamp(22px,4vw,32px)/1.12 var(--display)">' + q.prompt + '</h2><div class="opts">' + opts + '</div>' +
+    el.innerHTML = '<div class="vs-panel"><div class="qmeta">' + esc(roomName()) + '</div><h2 class="prompt" style="font:700 clamp(22px,4vw,32px)/1.12 var(--display)">' + q.prompt + '</h2><div class="opts">' + opts + '</div>' +
       '<div class="vs-reveal ' + (ok ? 'ok' : 'no') + '" data-vs="reveal" role="status"><div class="t"><h3>' + head + '</h3>' + pills + '<p>' + q.exp + '</p></div>' +
       (item ? '<div>' + Arc.cardHTML(item, .5, Arc.tierShown(item.id), false) + '</div>' : '') + '</div></div>';
     if (info.up >= 0 && !reduced()) { const r = el.getBoundingClientRect(); try { Arc.burst(r.left + r.width / 2, r.top + 120, 40, 220); } catch (e) { /* ignore */ } }
@@ -1275,7 +1275,7 @@ function resultHTML() {
   return topBar('') + errBox() + '<div id="vs-rematch"></div>' +
     '<div class="vs-panel"><h2 style="text-align:center;font-size:30px">' + esc(title) + '</h2>' + (forfeit ? '<p class="vs-sub" style="text-align:center">Won by forfeit: the other players left.</p>' : '') +
     '<div class="vs-podium" data-vs="podium">' + pod + '</div></div>' +
-    '<div class="vs-panel"><h2>Your result</h2><p style="margin:0;font:400 28px/1 var(--display);color:var(--gold)">' + (meP.score || 0) + ' pts &middot; ' + (meP.correct || 0) + '/' + nQ() + ' right</p>' + lostHTML + rewards + '</div>' + cta +
+    '<div class="vs-panel"><h2>Your result</h2><p style="margin:0;font:700 28px/1 var(--display);color:var(--gold)">' + (meP.score || 0) + ' pts &middot; ' + (meP.correct || 0) + '/' + nQ() + ' right</p>' + lostHTML + rewards + '</div>' + cta +
     // Phones: the per-question breakdown starts closed so the podium page stays short.
     '<div class="vs-play"><details class="vs-panel" data-vs="answers"' + (narrow() ? '' : ' open') + '><summary>Your answers</summary><div style="overflow-x:auto"><table class="vs-tbl" data-vs="breakdown"><thead><tr><th>#</th><th>Card</th><th>Result</th><th class="r">Pts</th><th class="r">Time</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>' +
     '<div class="vs-panel"><h2>The field</h2><div style="overflow-x:auto"><table class="vs-tbl" data-vs="field"><thead><tr><th>#</th><th>Player</th><th class="r">Score</th><th class="r">Right</th></tr></thead><tbody>' + field + '</tbody></table></div></div></div>' +
@@ -1290,7 +1290,7 @@ function updateRematch() {
   }
   if (R.seenRematch !== code) { R.seenRematch = code; tone('ok'); }
   if (host) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="vs-banner" data-vs="rematch-banner" role="status"><h2 style="margin:0;font:400 24px/1.1 var(--display);color:#fff">Rematch ready</h2><div class="vs-bigcode" data-vs="rematch-code">' + codeHTML(code) + '</div>' +
+  box.innerHTML = '<div class="vs-banner" data-vs="rematch-banner" role="status"><h2 style="margin:0;font:700 24px/1.1 var(--display);color:#fff">Rematch ready</h2><div class="vs-bigcode" data-vs="rematch-code">' + codeHTML(code) + '</div>' +
     '<button class="btn" data-vs="rematch-join" data-code="' + esc(code) + '">' + (R.guest ? 'Join again' : 'Join rematch') + '</button></div>';
 }
 async function rematch() {
