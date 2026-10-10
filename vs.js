@@ -1231,6 +1231,7 @@ function award() {
   // A win (1st place, at least 2 players who competed) earns one pack per match id. earnPack refuses a repeat, so
   // reopening this screen cannot pay twice; a rematch has a new id and can pay again. Guests earn packs too.
   if (finished && place === 1 && competed >= 2 && Arc.earnPack) rw.pack = Arc.earnPack('vs', R.code);
+  if (finished && answered && Arc.dailyPack) rw.daily = Arc.dailyPack();   // first finished VS match today (win or not): the daily pack
   R.rewards = rw;
   try { Arc.save(); } catch (e) { /* ignore */ }
   if (rw.lvAfter > rw.lvBefore) tone('level'); else tone('win');
@@ -1257,6 +1258,7 @@ function resultHTML() {
   if (rw.finished && !abandoned) {
     rewards = '<p class="vs-sub">You placed <b style="color:var(--gold)">' + ordinal(rw.place) + '</b> of ' + rw.total + '.' + (rw.bonus ? ' Placement bonus +' + rw.bonus + ' XP.' : '') + ' Cards earned: ' + rw.cards + '.</p>' +
       (rw.pack ? '<p data-vs="pack-earned"><span class="vs-pill">PACK EARNED: open it from your binder</span></p>' : '') +
+      (rw.daily ? '<p data-vs="daily-earned"><span class="vs-pill">DAILY PACK EARNED: open it from your binder</span></p>' : '') +
       (rw.lvAfter > rw.lvBefore ? '<p><span class="vs-pill">LEVEL UP: Lv ' + rw.lvAfter + ' ' + esc(Arc.levelInfo(S.xp).title) + '</span></p>' : '') +
       (rw.record ? '<p class="vs-sub" data-vs="vs-result-record">VS record: ' + rw.record.w + '-' + rw.record.l + (rw.record.streak ? ' &middot; streak ' + rw.record.streak : '') + '</p>' : '');
   } else rewards = '<p class="vs-sub">' + (meP.abandoned || R.kicked ? 'You were disconnected before the end, so there is no placement bonus.' : abandoned ? 'Everyone left before the end.' : 'No placement bonus this time.') + '</p>';

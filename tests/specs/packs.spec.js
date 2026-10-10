@@ -109,15 +109,17 @@ test.describe('earning', () => {
     const correct = await correctIndexes(host, arena, code);
     await Promise.all([playMatch(host, correct, () => ({ delay: 30 })), playMatch(kid, correct, () => ({ delay: 60, pick: 'wrong' }))]);
     for (const d of [host, kid]) await expect(d.page.locator('[data-vs="podium"]')).toBeVisible();
-    expect(await packs(host.page)).toEqual(['vs:' + code]);
-    expect(await packs(kid.page)).toEqual([]);
+    const today = await host.page.evaluate(() => 'day:' + Arcade.dayKey());
+    expect(await packs(host.page)).toEqual(['vs:' + code, today]);                     // the win, plus the first match of the day
+    expect(await packs(kid.page)).toEqual([today]);                                    // the loser: no win pack, but the daily one
+    await expect(kid.page.locator('[data-vs="daily-earned"]')).toBeVisible();
     await expect(host.page.locator('[data-vs="pack-earned"]')).toBeVisible();
     await expect(kid.page.locator('[data-vs="pack-earned"]')).toHaveCount(0);
     expect(await host.page.evaluate(c => Arcade.earnPack('vs', c), code)).toBe(false);   // the same match cannot pay twice
-    expect(await packs(host.page)).toEqual(['vs:' + code]);
+    expect(await packs(host.page)).toEqual(['vs:' + code, today]);
     // the pack reached the account (cloud save), and the rules accepted it
     const uid = await host.page.evaluate(() => Cloud.uid());
-    await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packs || []).map(x => x.id), { timeout: 8000 }).toEqual(['vs:' + code]);
+    await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packs || []).map(x => x.id), { timeout: 8000 }).toEqual(['vs:' + code, today]);
     expect(arena.backend.denials.filter(d => d.op !== 'get' && d.op !== 'list'), JSON.stringify(arena.backend.denials.slice(0, 2))).toEqual([]);
   });
 });
@@ -238,5 +240,71 @@ test.describe('signed in: merge and rules', () => {
     const g = await guest(arena); await g.join(code, { check: false, playerExtra: { icon: 'dragon-gold' } });
     await expectDenied(g.F.setDoc(g.ref('players', g.uid), { progress: {}, nick: 'x', cls: 'y', updated: g.F.serverTimestamp() }));   // guests still never write /players
     expect(host.uid).toBeTruthy();
+  });
+});
+
+test.describe('daily pack', () => {
+  // Play a whole solo round on the current screen (every answer right).
+  async function playRound(p) {
+    await p.locator('[data-act="play"]').click();
+    for (;;) {
+      await answerQ(p);
+      const nx = p.locator('[data-act="next"]');
+      await nx.click();
+      if (await p.locator('[data-ui="results-bar"]').count()) break;
+    }
+  }
+  test('signed in: a reminder pop-up once a day; the first finished room earns one pack; a second room does not', async ({ arena }) => {
+    const dev = await arena.device({ width: PHONE, dailyReminder: true }), p = dev.page;
+    await dev.goto('/');
+    await dev.signUp('class1', 'daily');
+    await expect(p.locator('[data-ui="daily-modal"]')).toBeVisible();
+    await expect(p.locator('[data-ui="daily-modal"]')).toContainText('Complete 1 room or VS match to earn it');
+    await expect(p.locator('[data-ui="daily-modal"]')).toContainText('Practice every day to win a free pack');
+    await p.waitForTimeout(300);
+    await p.screenshot({ path: SHOTS + 'daily-reminder-390.png' });
+    expect(await layoutProblems(p)).toEqual([]);
+    expect(await packs(p)).toEqual([]);                                                // signing in alone earns nothing
+    await p.locator('[data-daily="later"]').click();
+    await expect(p.locator('[data-ui="daily-modal"]')).toHaveCount(0);
+    await p.reload(); await p.waitForSelector('[data-act="deck"]'); await dev.cloudReady();
+    await expect(p.locator('[data-ui="daily-modal"]')).toHaveCount(0);                // once a day
+    await playRound(p);
+    const today = await p.evaluate(() => 'day:' + Arcade.dayKey());
+    expect(await packs(p)).toEqual([today]);
+    await expect(p.locator('[data-ui="pack-ready"]')).toContainText('Daily pack earned');
+    await p.locator('[data-act="home"]').first().click();
+    await playRound(p);
+    expect(await packs(p)).toEqual([today]);                                           // one per day
+    await expect(p.locator('[data-ui="pack-ready"]')).toHaveCount(0);
+    await p.locator('.iconbtn[data-act="binder"]').click();
+    await expect(p.locator('[data-act="pack-open"]')).toContainText('Earned: daily practice');
+    // the claim syncs: tomorrow on this account pays again, today on another device does not
+    const uid = await p.evaluate(() => Cloud.uid());
+    await expect.poll(() => (arena.backend.adminGet('players/' + uid).progress.packLog || []).includes(today), { timeout: 8000 }).toBe(true);
+    const other = await arena.device({ width: PHONE, dailyReminder: true }), q = other.page;
+    await other.goto('/'); await other.signIn('class1', 'daily');
+    await expect(q.locator('[data-ui="daily-modal"]')).toHaveCount(0);                 // already claimed today
+    expect(await q.evaluate(() => Arcade.dailyPack())).toBe(false);
+  });
+
+  test('the Play a room button starts a round; guests never get a daily pack or the pop-up', async ({ arena }) => {
+    const dev = await arena.device({ width: PHONE, dailyReminder: true }), p = dev.page;
+    await dev.goto('/');
+    await playRound(p);                                                                // guest
+    expect(await packs(p)).toEqual([]);
+    await expect(p.locator('[data-ui="daily-modal"]')).toHaveCount(0);
+    await p.locator('[data-act="home"]').first().click();
+    await dev.signUp('class1', 'player2');
+    await p.locator('[data-daily="play"]').click();
+    await expect(p.locator('.qmeta')).toBeVisible();
+  });
+
+  test('labels say why a pack was earned, not what is in it', async ({ arena }) => {
+    const dev = await arena.device({ firebase: 'blocked' }), p = dev.page;
+    await dev.goto('/');
+    const t = await p.evaluate(() => { const A = Arcade, it = A.ALL[0]; A.S.packs.push({ id: 'gold:' + it.id, reason: 'gold', cardId: it.id, slots: [] }, { id: 'vs:ABCDEF', reason: 'vs', matchId: 'ABCDEF', slots: [] }, { id: 'day:2026-10-10', reason: 'day', day: '2026-10-10', slots: [] }); A.render(); return it.name; });
+    await p.locator('[data-act="binder"]').click();
+    await expect(p.locator('[data-act="pack-open"]')).toHaveText([new RegExp('Earned: ' + t + ' reached Gold Legend'), /Earned: VS win/, /Earned: daily practice/]);
   });
 });
