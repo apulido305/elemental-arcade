@@ -88,6 +88,7 @@ h1,h2,h3{margin:0;font-weight:400}
 .stars svg{width:20px;height:20px}
 .stars.big svg{width:44px;height:44px}
 .foot{margin-top:28px;color:var(--mute);font-size:14px}
+.foot a{display:inline-flex;align-items:center;min-height:44px;color:var(--gold);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 
 /* quiz */
 .hud{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
@@ -1240,7 +1241,9 @@ function homeHTML(){
   '<section class="playnow" data-ui="play-now"><div><b>'+esc(deck.name)+' · '+esc(pr.name)+'</b><p class="sub">Every correct answer wins that card.</p></div>'+qnHTML()+'<button class="btn" data-act="play">Play</button></section>'+
   '<section><div class="sechead"><div><h1 class="h"><span class="step" aria-hidden="true">1</span>Pick a deck</h1><p class="sub hint">Every correct answer wins that card for your binder. Cards you miss come back more often.</p></div></div><div class="decks">'+chips+'</div></section>'+
   '<section class="sec"><div class="sechead"><h2 class="h"><span class="step" aria-hidden="true">2</span>Pick a room</h2><span class="sub" style="margin:0">Playing: <b style="color:var(--gold)">'+deck.name+'</b></span></div>'+
-  '<p class="roomstat" role="status" data-ui="room-status">'+esc(V.roomMsg||'')+'</p><div class="rooms'+(stag?' stag':'')+'">'+rooms+'</div></section>';
+  '<p class="roomstat" role="status" data-ui="room-status">'+esc(V.roomMsg||'')+'</p><div class="rooms'+(stag?' stag':'')+'">'+rooms+'</div></section>'+
+  // Home only, so a tap mid-round or mid-match cannot leave the game.
+  '<footer class="foot" data-ui="site-link"><a href="https://mrpulido.com">← Back to mrpulido.com</a></footer>';
 }
 function quizHTML(){
   const q=cur();const room=roomOf(V.roomId);const done=V.pick!=null;
