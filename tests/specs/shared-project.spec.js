@@ -256,7 +256,8 @@ test.describe('VS Arena across games', () => {
 
 test.describe('cards.json and guests', () => {
   test('cards.json matches the page: unprefixed ids, n = atomic number for elements, tag = mass', async ({ arena }) => {
-    expect(fs.readFileSync(path.join(ROOT, 'cards.json'), 'utf8'), 'run: node tools/export-cards.mjs').toBe(cardsText());
+    // a Windows checkout may have CRLF
+    expect(fs.readFileSync(path.join(ROOT, 'cards.json'), 'utf8').replace(/\r\n/g, '\n'), 'run: node tools/export-cards.mjs').toBe(cardsText());
     const j = buildCards();
     expect(j).toMatchObject({ game: 'chem', title: 'Elemental Arcade', version: 1, cats: B.GAMES.chem.cats });
     const dev = await arena.device({ firebase: 'blocked' });

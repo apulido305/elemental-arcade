@@ -38,7 +38,7 @@ export function buildCards() {
 export const cardsText = () => JSON.stringify(buildCards(), null, 1) + '\n';
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const file = path.join(ROOT, 'cards.json'), next = cardsText(), cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const file = path.join(ROOT, 'cards.json'), next = cardsText(), cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') : '';   // a Windows checkout may have CRLF
   if (process.argv.includes('--check')) { if (cur !== next) { console.error('cards.json is out of date: run node tools/export-cards.mjs'); process.exit(1); } console.log('ok'); }
   else { fs.writeFileSync(file, next); console.log((cur === next ? 'unchanged: ' : 'wrote ') + 'cards.json (' + buildCards().cards.length + ' cards)'); }
 }
