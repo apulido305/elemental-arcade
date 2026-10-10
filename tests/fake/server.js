@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.ico': 'image/x-icon', '.md': 'text/plain', '.woff2': 'font/woff2' };
+  '.ico': 'image/x-icon', '.md': 'text/plain', '.woff2': 'font/woff2', '.webp': 'image/webp' };
 
 export function startServer(backend, { port = 0, latencyMs = 0 } = {}) {
   const streams = new Map();   // cid -> {res, unsubs: Map(lid -> fn)}

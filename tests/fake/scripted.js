@@ -1,8 +1,11 @@
 // Node-side scripted clients: the same fake SDK as the browser (so rules, transactions and auth behave
 // identically), wired straight to the Backend with no browser. Used for tests that don't need a UI and
 // for driving "other players" while a browser plays.
+import { createRequire } from 'node:module';
 import { createSdk, MemoryStorage } from './sdk.js';
 import { CODE_ALPHABET } from './rules.js';
+createRequire(import.meta.url)('../../binder.js');
+const B = globalThis.Binder;
 
 export const wire = v => JSON.parse(JSON.stringify(v));
 
@@ -13,11 +16,15 @@ export function directTransport(backend) {
   };
 }
 
-// Same mapping cloud.js uses, so UI sign-ups and scripted sign-ups can sign in as each other.
-export const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-export const accountEmail = (cls, nick) => `${norm(cls)}_${norm(nick)}@players.elemental-arcade.example`;
-export const accountPass = (pin, cls) => `${pin}-${norm(cls)}-elemental`;
-export const EMPTY_PROGRESS = () => ({ owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: { w: 0, l: 0, streak: 0, best: 0, played: 0 }, vsAt: 0 });
+// The shared Binder account scheme (binder.js), so UI sign-ups and scripted sign-ups can sign in as each other.
+// Accounts made before the Binder use Elemental's original scheme (B.LEGACY_SCHEMES): see legacyAccount() below.
+export const norm = B.norm;
+export const accountEmail = B.accountEmail;
+export const accountPass = B.accountPass;
+export const LEGACY = B.LEGACY_SCHEMES[0];
+// A new account's profile (/players/{uid}) and an empty game doc (/players/{uid}/games/{gameId}).
+export const EMPTY_PROFILE = () => ({ xp: 0, level: 1, unlocked: [], finishes: {}, finishOn: {}, packs: [], packLog: [] });
+export const EMPTY_PROGRESS = () => B.emptyGame();
 export const makeCode = () => Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 const arenaError = (reason, message) => Object.assign(new Error(message || reason), { reason });
 
@@ -40,7 +47,15 @@ export class ScriptedClient {
     this.cls = norm(cls); this.nick = norm(nick);
     await this.A.setPersistence(this.auth, this.A.browserLocalPersistence);
     const cred = await this.A.createUserWithEmailAndPassword(this.auth, accountEmail(cls, nick), accountPass(pin, cls));
-    await this.F.setDoc(this.ref('players', cred.user.uid), { progress: EMPTY_PROGRESS(), nick: this.nick, cls: this.cls, updated: this.F.serverTimestamp() });
+    await this.F.setDoc(this.ref('players', cred.user.uid), Object.assign(EMPTY_PROFILE(), { nick: this.nick, cls: this.cls, updated: this.F.serverTimestamp() }));
+    return cred.user;
+  }
+  /** An account exactly as pre-Binder Elemental made it: the legacy email scheme and one doc holding 'progress'. */
+  async legacySignUp(cls, nick, pin = '1234', progress = {}, icon = 'atom') {
+    this.cls = norm(cls); this.nick = norm(nick);
+    await this.A.setPersistence(this.auth, this.A.browserLocalPersistence);
+    const cred = await this.A.createUserWithEmailAndPassword(this.auth, LEGACY.email(cls, nick), LEGACY.pass(pin, cls));
+    await this.F.setDoc(this.ref('players', cred.user.uid), { progress: Object.assign({ owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: B.VS0(), vsAt: 0 }, progress), nick: this.nick, cls: this.cls, icon, updated: this.F.serverTimestamp() });
     return cred.user;
   }
   async signIn(cls, nick, pin = '1234') {
@@ -64,7 +79,7 @@ export class ScriptedClient {
   matchDoc(o = {}) {
     const F = this.F, now = this.backend.now();
     return Object.assign({
-      hostUid: this.uid, hostNick: this.nick, cls: this.cls, deck: 's20', room: 'mixed', seed: (Math.random() * 0x100000000) >>> 0, cap: 20,
+      game: 'chem', hostUid: this.uid, hostNick: this.nick, cls: this.cls, deck: 's20', room: 'mixed', seed: (Math.random() * 0x100000000) >>> 0, cap: 20,
       allowGuests: true, listed: true, status: 'lobby', createdAt: F.serverTimestamp(), expireAt: F.Timestamp.fromMillis(now + 5 * 60 * 1000 * this.backend.timeScale),
       playerCount: 1, startAt: null, alive: 1, aggUid: this.uid, aggUntil: F.Timestamp.fromMillis(now + 30000 * this.backend.timeScale), winnerUid: null, endedAt: null, rematch: null
     }, o);

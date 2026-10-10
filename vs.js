@@ -1,4 +1,5 @@
-// VS Arena for Elemental Arcade: a live 2 to 20 player match.
+// VS Arena for Elemental Arcade: a live 2 to 20 player match. Every arcade game shares the matches collection: a match's
+// 'game' field ('chem' here; a match without it is Elemental's) picks its decks and rooms and filters the class lobby.
 // Loaded as an ES module after cloud.js. Everything VS lives here and renders into its own overlay (#vs),
 // so solo play in index.html is untouched. If Cloud / Cloud.fb is missing this file does nothing and throws nothing.
 //
@@ -72,7 +73,8 @@ const MSG = {
   noguests: 'This arena is not open to guests. Sign in to join.',
   guestauth: 'Guest play is not set up yet. Ask your teacher, or sign in.',
   net: 'Could not reach the server. Check your connection and try again.',
-  host: 'Only signed-in students can host an arena.'
+  host: 'Only signed-in students can host an arena.',
+  othergame: 'That code is for an arena in another game. Open that game to join it.'
 };
 
 /* ---------- module state ---------- */
@@ -376,9 +378,10 @@ function watchLobby() {
   sweep();   // background cleanup of this class's dead arenas (throttled; never blocks the menu)
   const F = fb.F, db = fb.db;
   try {
-    const q = F.query(F.collection(db, 'matches'), F.where('listed', '==', true), F.where('status', '==', 'lobby'), F.where('cls', '==', acct.cls), F.limit(20));
+    const q = F.query(F.collection(db, 'matches'), F.where('listed', '==', true), F.where('status', '==', 'lobby'), F.where('cls', '==', acct.cls), F.where('game', '==', Arc.GAME), F.limit(20));
     const apply = snap => {
-      const out = []; snap.forEach(d => out.push(Object.assign({ code: d.id }, d.data())));
+      // Another game's arena never belongs here (its decks and rooms are not ours), even if a stale query returns one.
+      const out = []; snap.forEach(d => { const m = d.data(); if ((m.game || 'chem') === Arc.GAME) out.push(Object.assign({ code: d.id }, m)); });
       out.forEach(d => { if (d.status === 'lobby' && toMs(d.expireAt) && toMs(d.expireAt) < Date.now()) F.updateDoc(F.doc(db, 'matches', d.code), { status: 'expired' }).catch(() => {}); });
       ui.lobby = out; renderLobbyList();
     };
@@ -514,7 +517,8 @@ async function joinFlow(raw, opts) {
   } catch (e) {
     ui.busy = false; ui.joining = false;
     if (guest && !(opts && opts.keepGuest)) { try { await C.signOutGuest(); } catch (x) { /* ignore */ } }
-    setErr(MSG[e && e.vs] || MSG.net); softBusy();
+    const other = e && e.vs === 'othergame' && window.Binder && window.Binder.GAMES[e.message];
+    setErr(other ? 'That code is for an arena in ' + other.title + '. Open ' + other.title + ' to join it.' : MSG[e && e.vs] || MSG.net); softBusy();
   }
 }
 function softBusy() {
@@ -532,6 +536,8 @@ async function joinTx(code, nick, guest) {
       const ms = await tx.get(mref);
       if (!ms.exists()) throw vsErr('missing');
       const m = ms.data();
+      // A code from another arcade game (a match without 'game' is Elemental's): its decks and rooms are not ours.
+      if ((m.game || 'chem') !== Arc.GAME) throw vsErr('othergame', m.game || 'chem');
       const mine = await tx.get(pref);
       if (mine.exists()) {
         if (m.status === 'lobby') return;
@@ -584,7 +590,7 @@ async function createMatch(o) {
     if (taken) continue;
     const now = Date.now(), b = F.writeBatch(db);
     b.set(mref, Object.assign({
-      hostUid: uid, hostNick: acct.nick, cls: acct.cls, deck: o.deck, room: o.room, seed: (Math.random() * 0x100000000) >>> 0,
+      game: Arc.GAME, hostUid: uid, hostNick: acct.nick, cls: acct.cls, deck: o.deck, room: o.room, seed: (Math.random() * 0x100000000) >>> 0,
       cap: o.cap, allowGuests: o.allowGuests, listed: o.listed, status: 'lobby', createdAt: F.serverTimestamp(),
       expireAt: F.Timestamp.fromMillis(now + SOLO_BASE * TS()), playerCount: 1, startAt: null, alive: 1, aggUid: uid,
       aggUntil: F.Timestamp.fromMillis(now + AGG_BASE * TS()), winnerUid: null, endedAt: null, rematch: null

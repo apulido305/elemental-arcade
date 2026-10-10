@@ -3,7 +3,23 @@
 A periodic table card quiz game. Win element, ion and isotope cards by answering questions.
 Live site: https://apulido305.github.io/elemental-arcade/
 
-Files: `index.html` (the whole game), `cloud.js` (optional sign-in and saving), `firebase-config.js` (your Firebase keys), `firestore.rules` (database security), `vs.js` (VS Arena, live multiplayer).
+Files: `index.html` (the whole game), `binder.js` (the shared Binder: accounts, saving, icons; the same file in every arcade game), `cloud.js` (optional sign-in and saving), `firebase-config.js` (your Firebase keys), `firestore.rules` (database security, shared by every arcade game), `vs.js` (VS Arena, live multiplayer), `cards.json` (this game's cards for other games' Binders; `node tools/export-cards.mjs` rebuilds it).
+
+## The Binder (shared with Cell Arcade)
+
+Elemental Arcade and its biology sibling [Cell Arcade](https://apulido305.github.io/cell-arcade/) share one Firebase project (this one, `elemental-arc`), one student account and one **Binder**: a collection with a deck from every game. The contract is `design/binder-spec.md` in the Cell Arcade repo.
+
+- **One account.** The same class code, nickname and PIN work in both games.
+- **Account-wide:** XP and level, the profile icon, and everything from packs (unopened packs, unlocked icons, card finishes, the daily-pack claim). An icon unlocked in one game can be used in the other; the daily pack is once a day per account, whichever game earns it.
+- **Per game:** cards, misses, room stars and the VS record. Elemental keeps them in `/players/{uid}/games/chem`, Cell Arcade in `games/bio`. The account-wide part is the profile, `/players/{uid}`.
+- **The Binder screen** shows packs, then a shelf with one spine per game, totals across games (cards, Gold Legends, account level), then the open game's cards. Cell Arcade's cards come from its published `cards.json`.
+- **Guests** keep everything in this browser under `arcade-v1`. Both games are on the same site, so a guest's Binder spans them. An older guest save (`elemental-arcade-v1`) moves there by itself on the first visit.
+- **VS Arena** arenas belong to one game (`game` on the match). The class lobby lists only Elemental arenas, and a Cell Arcade code is refused with a message to open Cell Arcade.
+- **Shared files.** `binder.js` and `firestore.rules` must stay byte for byte the same in both repos. Change them in both, bump `BINDER_VERSION` (and `?v=` on the script tag), run `node tools/sync-rules.mjs` in Cell Arcade, and republish the rules.
+- **Card ids never change** (`el1`, `cat3`, `iso12`, no game prefix), and neither do icon ids (`atom`, `cat`, `cat-gold`). Other games' ids carry their prefix (`bio:org3`, `bio:frog`).
+
+**Transition (pre-Binder saves).** Before the Binder, Elemental saved one doc, `/players/{uid}` = `{progress, nick, cls, icon, updated}`. The Binder reads that `progress` map as Elemental's cards plus the account half, and while a doc has one, every save mirrors XP, unlocks, finishes and the daily-pack claim back into it. An old copy of the page still open on some phone therefore keeps working and loses nothing. Never delete `progress` by hand. Once every student has the new page, a later `BINDER_VERSION` can retire the mirror and the matching transition rules.
+
 
 ## Turn on sign-in and saved binders (Firebase, free tier)
 
@@ -19,19 +35,24 @@ Until you do this, the game works as a guest and saves only in each browser.
 
 ## How sign-in works
 
-Students make an account with a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase, so no real email or name is stored. Each student can read and write only their own save.
+Students make an account with a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase (`{class}_{nick}@players.arcade.example`, the same in every arcade game), so no real email or name is stored. Each student can read and write only their own save.
+
+Accounts made before the Binder keep Elemental's original made-up email (`…@players.elemental-arcade.example`). Sign-in tries the shared scheme first, then the original one, so nobody has to do anything. On New account, the game first tries the original scheme with the class code, nickname and PIN given: if that account exists, the student is signed in to it (and told so) instead of getting a second account.
 
 Signing in needs only the nickname and PIN. At sign-up the game stores `/names/{nickname}` with the class code, and sign-in looks it up. Nicknames are therefore unique across all classes for new accounts.
 
 - Anyone can invent a class code. It is shown on the account screen.
 - Accounts made before the lookup existed are asked for their class code once. After that sign-in, the nickname is claimed and the class code is not needed again. (A student already signed in on a device claims it on their next visit.)
-- After this change, publish the updated `firestore.rules`. Until then, sign-in falls back to asking for the class code.
+- Accounts made in Cell Arcade are asked for their class code the first time they sign in here, which claims the nickname.
+- The `/names` rule accepts both account schemes; it is part of the shared `firestore.rules`.
 - There is no PIN reset. To let a student start over, delete their user under Authentication > Users and their document under Firestore > players.
 - Tell students to use a nickname, not their real name.
 
 ## Profile icons
 
-Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon button next to their level. There is no upload, drawing or free text, and only the icon's id is stored, never an image. Guests keep theirs in this browser only; signed-in students keep theirs on their player document (`icon` next to `nick`), so it follows them to any device. In VS Arena the icon is copied onto the student's seat in the match so classmates can see it; the rules accept only the 16 ids.
+Students pick one of 16 preset icons (atom, bolt, flask and so on) from the icon button next to their level, plus any icon they unlocked from a pack in any arcade game. There is no upload, drawing or free text, and only the icon's id is stored, never an image. Guests keep theirs in this browser only; signed-in students keep theirs on their profile (`icon` next to `nick`), so it follows them to any device and every arcade game. In VS Arena the icon is copied onto the student's seat in the match so classmates can see it; the rules accept only known ids (free, or unlocked by that account).
+
+Elemental's 16 free icons are drawn as inline SVGs here; `img/icons/{id}.webp` holds a 128 px copy of each (from `design/icons/v2/`) so other games can show them. Another game's icon is loaded from that game's site; if it cannot load, a two-letter monogram shows instead.
 
 ## Packs
 
@@ -41,7 +62,7 @@ A gold badge on the Binder button counts unopened packs. Open one from the binde
 
 Each pack has 3 cards: a staple (a special finish on one of your cards, or XP), an icon pull (one of 34 pack-only icons in Common, Uncommon, Rare and Epic bands, or a gold icon), and a chase card (usually XP, sometimes a rare, epic or gold icon, including a 0.05% "this week's gold"). Every number is posted in the binder under "Pack odds", and in `design/pack-odds.md`. No duplicates: an owned pull drops a band, then turns into XP. The 16 starter icons stay free. Finishes are cosmetic and never change a card's level.
 
-Guests keep their packs, finishes and unlocked icons on the device (local storage), as with their cards. Signed-in students keep them on their account, and they merge across devices without duplicating a pack or losing an unlock.
+Guests keep their packs, finishes and unlocked icons on the device (local storage), as with their cards. Signed-in students keep them on their account, and they merge across devices without duplicating a pack or losing an unlock. Packs are account-wide: a pack earned in Cell Arcade can be opened here (its icons and card finish show with their names), and the daily pack is one a day per account across both games. Packs rolled here still pay only Elemental's icons.
 
 Art: the pack icons and gold icons reuse the existing icon art (`design/icons/`), resized into `img/icons/`. The pack wrapper (`img/pack.webp`) was generated with fal.ai (`fal-ai/flux-2/flash`, about $0.05 including the model probe; see `design/pack-art.md`). The fal.ai key used for it was passed on the command line only and was never written to the repository.
 

@@ -1,5 +1,5 @@
-// Rules fake: a data-driven JS port of the VS Arena security rules (SPEC.md "Data model") plus the existing
-// /players rule (progress whitelist now also allows vs, vsAt). It is evaluated by the backend on every
+// Rules fake: a data-driven JS port of firestore.rules: the Binder profile (/players/{uid}) and per-game progress
+// (/players/{uid}/games/{gameId}), plus the VS Arena matches with deck and room whitelists keyed by game. It is evaluated by the backend on every
 // read, list and write. Keep it readable: it is meant to be diffed against the real firestore.rules.
 //
 // Shape:  RULES = [{ path: 'a/{x}/b/{y}', get|list|create|update|delete: <op> }]
@@ -14,27 +14,41 @@
 //   c.get(path)/c.exists(path)  state BEFORE the commit;  c.getAfter(path)/c.existsAfter(path)  state AFTER it
 //   c.changed  top-level keys whose value differs between res and inc (request.resource.data.diff().affectedKeys())
 
+import { createRequire } from 'node:module';
+createRequire(import.meta.url)('../../binder.js');   // icon ids and games come from the shared Binder registry
+const B = globalThis.Binder;
+
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-export const DECK_IDS = ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all'];
-export const ROOM_IDS = ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed'];
+export const GAME_IDS = ['chem', 'bio'];
+// VS decks and rooms per game (rules: deckRoomOk). A match without 'game' is a pre-Binder Elemental match: 'chem'.
+export const DECKS_BY_GAME = {
+  chem: ['s20', 'r4', 'r5', 'r6', 'r7', 'e118', 'cat', 'an', 'iso', 'all'],
+  bio: ['s20', 'cell', 'aa', 'tree', 'body', 'eco', 'all']
+};
+export const ROOMS_BY_GAME = {
+  chem: ['ability', 'symbol', 'number', 'shells', 'config', 'table', 'type', 'lab', 'ion', 'metal', 'mixed'],
+  bio: ['function', 'code', 'codon', 'tree', 'kingdom', 'cellmap', 'plant', 'body', 'mixed']
+};
+export const DECK_IDS = DECKS_BY_GAME.chem, ROOM_IDS = ROOMS_BY_GAME.chem;   // this game's
 export const REACTIONS = ['nice', 'hmm', 'fire', 'gg', 'oops'];
-// Profile icon ids (index.html ICONS). Optional on /players and on seats; anything else is rejected.
-export const ICON_IDS = ['atom', 'bolt', 'beaker', 'crystal', 'flame', 'droplet', 'magnet', 'moon', 'star', 'comet', 'rocket', 'flask', 'crown', 'shield', 'spark', 'wave'];   // free
-export const WIN_ICON_IDS = ['boba', 'camera', 'cat', 'dice', 'dog', 'donut', 'pizza', 'note', 'sneaker', 'headphones', 'soccer', 'hoop', 'cactus', 'shades', 'bulb', 'skateboard', 'boombox', 'controller', 'vinyl', 'guitar', 'fox', 'panda', 'plane', 'rainbow', 'joystick', 'trophy', 'robot', 'planet', 'axolotl', 'ufo', 'volcano', 'chest', 'dragon', 'dino'];
-export const PACK_ICON_IDS = WIN_ICON_IDS.concat(ICON_IDS.concat(WIN_ICON_IDS).map(i => i + '-gold'));   // winnable + gold
+// Profile icon ids (binder.js ICON_SETS). Optional on /players and on seats; anything else is rejected.
+export const ICON_IDS = B.FREE_ICONS.slice();                 // free, every game
+export const WIN_ICON_IDS = B.PACK_ICONS.slice();            // pack-only, every game
+export const PACK_ICON_IDS = B.UNLOCKABLE.slice();           // winnable + gold
 const FINISH_IDS = ['foil', 'holo', 'night', 'ember'];
 const MAX_CAP = 20, MIN_CAP = 2, MIN = 60 * 1000;
 
 export const MATCH_KEYS = ['hostUid', 'hostNick', 'cls', 'deck', 'room', 'seed', 'cap', 'allowGuests', 'listed', 'status',
   'createdAt', 'expireAt', 'playerCount', 'startAt', 'alive', 'aggUid', 'aggUntil', 'winnerUid', 'endedAt', 'rematch'];
-const MATCH_OPTIONAL = ['qn'];   // hasOnly allows it, hasAll does not require it
+const MATCH_OPTIONAL = ['qn', 'game'];   // hasOnly allows them, hasAll does not require them
 export const PLAYER_KEYS = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'reaction',
   'reactionAt', 'abandoned', 'left', 'streak'];
 const SEAT_KEYS = PLAYER_KEYS.concat(['icon']);     // icon is optional: hasOnly allows it, hasAll does not require it
 const PLAYER_REQUIRED = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'abandoned', 'left'];
 export const ANSWER_KEYS = ['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'];
-const PROGRESS_KEYS = ['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'];
-const TOP_PLAYER_KEYS = ['progress', 'nick', 'cls', 'icon', 'updated'];
+const PROFILE_KEYS = ['nick', 'cls', 'icon', 'xp', 'level', 'updated', 'unlocked', 'finishes', 'finishOn', 'packs', 'packLog', 'progress'];
+const LEGACY_PROGRESS_KEYS = ['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'];
+const GAME_DOC_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog', 'updated'];
 
 // ---- tiny helpers (the Firestore-rules vocabulary) ----
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v) && !('__ts' in v);
@@ -49,11 +63,15 @@ const hasOnly = (o, allowed) => isObj(o) && keys(o).every(k => allowed.includes(
 const hasAll = (o, req) => isObj(o) && req.every(k => k in o);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const subset = (arr, allowed) => arr.every(k => allowed.includes(k));
-// /players doc: free icon, or one unlocked in this doc's progress.unlocked.
-const iconOk = d => !('icon' in d) || ICON_IDS.includes(d.icon) || (isObj(d.progress) && Array.isArray(d.progress.unlocked) && d.progress.unlocked.includes(d.icon));
+// /players doc: free icon, or one unlocked in this doc's 'unlocked'.
+// unlocked: the Binder's top-level list, or a pre-Binder Elemental doc's progress.unlocked (rules: unlockedOf)
+const unlockedOf = d => [].concat(Array.isArray(d && d.unlocked) ? d.unlocked : [], d && isObj(d.progress) && Array.isArray(d.progress.unlocked) ? d.progress.unlocked : []);
+const iconOk = d => !('icon' in d) || ICON_IDS.includes(d.icon) || unlockedOf(d).includes(d.icon);
 // Seat: free; an account's unlocked icon (from their /players doc); a guest: any pack icon id.
 const seatIconOk = (c, d) => !('icon' in d) || ICON_IDS.includes(d.icon) || (c.anon ? PACK_ICON_IDS.includes(d.icon)
-  : (() => { const p = c.get('players/' + c.uid); return !!p && isObj(p.progress) && Array.isArray(p.progress.unlocked) && p.progress.unlocked.includes(d.icon); })());
+  : (() => { const p = c.get('players/' + c.uid); return !!p && unlockedOf(p).includes(d.icon); })());
+const gameOf = m => (m && 'game' in m ? m.game : 'chem');                                  // rules: m.get('game', 'chem')
+const deckRoomOk = m => GAME_IDS.includes(gameOf(m)) && (DECKS_BY_GAME[gameOf(m)] || []).includes(m.deck) && (ROOMS_BY_GAME[gameOf(m)] || []).includes(m.room);
 const validCode = s => isStr(s) && s.length === 6 && [...s].every(ch => CODE_ALPHABET.includes(ch));
 
 const alt = (name, ...clauses) => ({ name, clauses });
@@ -88,11 +106,12 @@ const cleanupClause = ['cleanup: account, and the match is dead (ended, > 1 day 
 const matchCreate = [
   signedIn, notAnon,
   ['code is 6 chars from the alphabet', c => validCode(c.params.code)],
-  ['exactly the allowed keys (qn optional)', c => hasOnly(c.inc, MATCH_KEYS.concat(MATCH_OPTIONAL)) && hasAll(c.inc, MATCH_KEYS)],
+  ['exactly the allowed keys (qn, game optional)', c => hasOnly(c.inc, MATCH_KEYS.concat(MATCH_OPTIONAL)) && hasAll(c.inc, MATCH_KEYS)],
+  ['game (if present) is a known game id', c => GAME_IDS.includes(gameOf(c.inc))],
   ['qn (if present) is 10, 15 or 20', c => QNS.includes(qn(c.inc))],
   ['hostUid == uid', c => c.inc.hostUid === c.uid],
   ['cls and hostNick match the host /players doc', c => { const p = ownPlayerDoc(c); return !!p && c.inc.cls === p.cls && c.inc.hostNick === p.nick; }],
-  ['deck and room are known ids', c => DECK_IDS.includes(c.inc.deck) && ROOM_IDS.includes(c.inc.room)],
+  ['deck and room are known ids for the game', c => deckRoomOk(c.inc)],
   ['seed is a uint32', c => intIn(c.inc.seed, 0, 4294967295)],
   ['cap is an int 2..20', c => intIn(c.inc.cap, MIN_CAP, MAX_CAP)],
   ['allowGuests and listed are booleans', c => isBool(c.inc.allowGuests) && isBool(c.inc.listed)],
@@ -120,7 +139,7 @@ const matchUpdate = [
     ['lobby before and after', c => c.res.status === 'lobby' && c.inc.status === 'lobby'],
     ['only deck, room, seed, qn, cap, allowGuests, listed change', c => subset(c.changed, SETTINGS)],
     ['qn is 10, 15 or 20', c => QNS.includes(qn(c.inc))],
-    ['deck and room known', c => DECK_IDS.includes(c.inc.deck) && ROOM_IDS.includes(c.inc.room)],
+    ['deck and room known for the game', c => deckRoomOk(c.inc)],
     ['seed is a uint32', c => intIn(c.inc.seed, 0, 4294967295)],
     ['cap 2..20 and >= playerCount', c => intIn(c.inc.cap, MIN_CAP, MAX_CAP) && c.inc.cap >= c.res.playerCount],
     ['allowGuests and listed booleans', c => isBool(c.inc.allowGuests) && isBool(c.inc.listed)]),
@@ -178,7 +197,7 @@ const seatCreate = [
   ['joinedAt == request.time', c => ms(c.inc.joinedAt) === c.time],
   ['score, correct, totalMs, streak 0; answeredQ -1', c => c.inc.score === 0 && c.inc.correct === 0 && c.inc.totalMs === 0 && c.inc.answeredQ === -1 && c.inc.streak === 0],
   ['abandoned and left false; reaction and reactionAt null', c => c.inc.abandoned === false && c.inc.left === false && c.inc.reaction === null && c.inc.reactionAt === null],
-  ['guest nick is "Adjective Element"; account nick is own /players nick', c => c.anon
+  ['guest nick is "Adjective Noun" (Adjective Element here); account nick is own /players nick', c => c.anon
     ? isStr(c.inc.nick) && /^[A-Z][a-z]{2,11} [A-Z][a-z]{2,11}$/.test(c.inc.nick)
     : (!!ownPlayerDoc(c) && c.inc.nick === ownPlayerDoc(c).nick)]
 ];
@@ -241,27 +260,41 @@ const presenceWrite = [
   ['keys hasOnly [at]', c => hasOnly(c.inc, ['at'])]
 ];
 
-// ---- /players/{uid} (existing rule + vs, vsAt; anonymous users get nothing) ----
+// ---- /players/{uid} (account-wide profile) and /players/{uid}/games/{gameId} (one game's progress) ----
 const playersOwn = [signedIn, notAnon, ['uid == auth.uid', c => c.params.uid === c.uid]];
+const packDataOk = d => (!('unlocked' in d) || (Array.isArray(d.unlocked) && d.unlocked.every(i => PACK_ICON_IDS.includes(i))))
+  && (!('packs' in d) || (Array.isArray(d.packs) && d.packs.length <= 200)) && (!('packLog' in d) || Array.isArray(d.packLog))
+  && (!('finishes' in d) || isObj(d.finishes)) && (!('finishOn' in d) || (isObj(d.finishOn) && Object.values(d.finishOn).every(f => FINISH_IDS.includes(f))));
 const playersWrite = playersOwn.concat([
-  ['keys hasOnly progress, nick, cls, icon, updated', c => hasOnly(c.inc, TOP_PLAYER_KEYS)],
-  ['icon (if present): free, or unlocked in this doc (progress.unlocked)', c => iconOk(c.inc)],
-  ['progress is a map with whitelisted keys', c => isObj(c.inc.progress) && hasOnly(c.inc.progress, PROGRESS_KEYS)],
-  ['progress.vs (if present) is a map with keys w, l, streak, best, played', c => !('vs' in c.inc.progress) || (isObj(c.inc.progress.vs) && hasOnly(c.inc.progress.vs, ['w', 'l', 'streak', 'best', 'played']))],
-  ['progress.vsAt (if present) is a number', c => !('vsAt' in c.inc.progress) || typeof c.inc.progress.vsAt === 'number'],
-  ['progress.unlocked (if present) is a list of pack icon ids', c => !('unlocked' in c.inc.progress) || (Array.isArray(c.inc.progress.unlocked) && c.inc.progress.unlocked.every(i => PACK_ICON_IDS.includes(i)))],
-  ['progress.packs (if present) is a list of at most 200; packLog a list', c => (!('packs' in c.inc.progress) || (Array.isArray(c.inc.progress.packs) && c.inc.progress.packs.length <= 200)) && (!('packLog' in c.inc.progress) || Array.isArray(c.inc.progress.packLog))],
-  ['progress.finishes is a map; finishOn values are finish ids', c => (!('finishes' in c.inc.progress) || isObj(c.inc.progress.finishes)) && (!('finishOn' in c.inc.progress) || (isObj(c.inc.progress.finishOn) && Object.values(c.inc.progress.finishOn).every(f => FINISH_IDS.includes(f))))]
+  ['profile keys hasOnly nick, cls, icon, xp, level, updated, unlocked, finishes, finishOn, packs, packLog', c => hasOnly(c.inc, PROFILE_KEYS)],
+  ['nick and cls are strings', c => isStr(c.inc.nick) && isStr(c.inc.cls)],
+  ['icon (if present): free, or unlocked in this doc', c => iconOk(c.inc)],
+  ['xp (if present) is a number >= 0; level an int >= 1', c => (!('xp' in c.inc) || (typeof c.inc.xp === 'number' && c.inc.xp >= 0)) && (!('level' in c.inc) || (isInt(c.inc.level) && c.inc.level >= 1))],
+  ['pack data: unlocked are pack icon ids, packs <= 200, packLog a list, finishes a map, finishOn values finish ids', c => packDataOk(c.inc)],
+  ['progress (pre-Binder Elemental save, if present): whitelisted keys, pack data, vs shape', c => !('progress' in c.inc) || (isObj(c.inc.progress)
+    && hasOnly(c.inc.progress, LEGACY_PROGRESS_KEYS) && packDataOk(c.inc.progress)
+    && (!('vs' in c.inc.progress) || (isObj(c.inc.progress.vs) && hasOnly(c.inc.progress.vs, ['w', 'l', 'streak', 'best', 'played'])))
+    && (!('vsAt' in c.inc.progress) || typeof c.inc.progress.vsAt === 'number'))]
+]);
+const gamesWrite = playersOwn.concat([
+  ['gameId is a known game', c => GAME_IDS.includes(c.params.gameId)],
+  ['game doc keys whitelisted', c => hasOnly(c.inc, GAME_DOC_KEYS)],
+  ['owned, miss, stars (if present) are maps', c => ['owned', 'miss', 'stars'].every(k => !(k in c.inc) || isObj(c.inc[k]))],
+  ['vs (if present) is a map with keys w, l, streak, best, played', c => !('vs' in c.inc) || (isObj(c.inc.vs) && hasOnly(c.inc.vs, ['w', 'l', 'streak', 'best', 'played']))],
+  ['vsAt (if present) is a number', c => !('vsAt' in c.inc) || typeof c.inc.vsAt === 'number'],
+  ['pack data (legacy keys) well formed', c => packDataOk(c.inc)]
 ]);
 
-// ---- /names/{nick}: nickname -> class code for sign-in. Public get, own claim only, never changed ----
+// ---- /names/{nick}: nickname -> class code for sign-in. Public get, own claim only (either account scheme), never changed ----
+const nameEmails = c => [B.EMAIL_DOMAIN].concat(B.LEGACY_SCHEMES.map(l => l.email('', '').split('@')[1])).map(d => c.inc.cls + '_' + c.params.nick + '@' + d);
 const nameCreate = [signedIn, notAnon,
   ['keys hasOnly cls, uid', c => hasOnly(c.inc, ['cls', 'uid'])],
   ['uid == auth.uid', c => c.inc.uid === c.uid],
-  ['auth email == {cls}_{nick}@players.elemental-arcade.example', c => typeof c.inc.cls === 'string' && c.email === c.inc.cls + '_' + c.params.nick + '@players.elemental-arcade.example']];
+  ['auth email == {cls}_{nick}@players.arcade.example (or the legacy players.elemental-arcade.example)', c => typeof c.inc.cls === 'string' && nameEmails(c).includes(c.email)]];
 
 export const RULES = [
   { path: 'players/{uid}', get: playersOwn, create: playersWrite, update: playersWrite },
+  { path: 'players/{uid}/games/{gameId}', get: playersOwn, list: playersOwn, create: gamesWrite, update: gamesWrite },
   { path: 'names/{nick}', get: [['anyone', () => true]], create: nameCreate },
   {
     path: 'matches/{code}',
