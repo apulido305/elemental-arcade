@@ -52,7 +52,7 @@ for (const w of [PHONE, DESKTOP]) {
     await p.locator('[data-act="icon-pick"][data-id="flask"]').click();
     const sel = p.locator('[data-act="icon-pick"][data-id="flask"]');
     await expect(sel).toHaveAttribute('aria-checked', 'true');
-    expect(await sel.evaluate(e => getComputedStyle(e).outlineColor)).toBe('rgb(243, 221, 122)');   // gold ring
+    expect(await sel.evaluate(e => getComputedStyle(e).outlineColor)).toBe('rgb(0, 245, 255)');     // plasma cyan ring
     await expect(p.locator('[data-ui="pick-label"]')).toHaveText('Flask');
     await expect(p.locator('[data-act="icon-use"]')).toBeEnabled();
     // keyboard: arrows move the selection (and focus) through the group, wrapping at the ends
