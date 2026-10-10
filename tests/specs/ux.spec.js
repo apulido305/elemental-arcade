@@ -27,6 +27,7 @@ for (const w of [PHONE, DESKTOP]) {
     await expect(p.locator('[data-act="account"] .gtag')).toHaveText('Guest');
     await expect(p.locator('[data-act="mute"]')).toHaveAttribute('aria-label', 'Sound on');
     await expect(p.locator('[data-act="icons"]')).toHaveAttribute('aria-label', 'Change profile icon');
+    await expect(p.locator('[data-ui="site-link"] a')).toHaveAttribute('href', 'https://mrpulido.com');
     expect(await layoutProblems(p)).toEqual([]);
     const m = await p.evaluate(() => ({ header: document.querySelector('.top').getBoundingClientRect().height, page: document.documentElement.scrollHeight }));
     if (w === PHONE) expect(m.header).toBeLessThanOrEqual(120);
