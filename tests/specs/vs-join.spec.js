@@ -165,7 +165,10 @@ test.describe('class lobby', () => {
     await expect(expiry).toHaveText(/closes in (9|10):\d\d/);
     await expect(host.page.locator('[data-vs="gone-msg"]')).toHaveText(/expired/i, { timeout: 20000 });
     await expect.poll(() => arena.backend.adminGet('matches/' + code).status, { timeout: 5000 }).toBe('expired');
-    expect(arena.backend.denials.filter(d => !['get', 'list'].includes(d.op)), JSON.stringify(arena.backend.denials)).toEqual([]);   // reads: the kid's listener after leaving
+    // Allowed denials: reads by the kid's listener after leaving, and the expiry race (host and kid both mark the
+    // lobby expired; whoever is second is refused because it already is). Anything else is a bug.
+    const raced = d => d.op === 'update' && d.path === 'matches/' + code && arena.backend.adminGet('matches/' + code).status === 'expired' && /expires a lobby after expireAt: failed "res.status == 'lobby'"/.test(d.reason);
+    expect(arena.backend.denials.filter(d => !['get', 'list'].includes(d.op) && !raced(d)), JSON.stringify(arena.backend.denials)).toEqual([]);
   });
 });
 
