@@ -5,15 +5,16 @@ import { expectDenied, expectCode } from '../helpers/arena.js';
 test.describe('firestore fake', () => {
   test('serverTimestamp is resolved by the backend clock; increment; Timestamp round trip', async ({ arena }) => {
     const c = arena.client('c'); await c.signUp('class1', 'kid');
-    const F = c.F, ref = c.ref('players', c.uid);
+    const F = c.F, ref = c.ref('players', c.uid, 'games', 'chem');
+    await F.setDoc(ref, { owned: {} });
     arena.backend.advanceClock(3600e3);                                  // backend "now" is an hour ahead of the client
-    await F.updateDoc(ref, { updated: F.serverTimestamp(), 'progress.xp': F.increment(5) });
-    await F.updateDoc(ref, { 'progress.xp': F.increment(7), 'progress.vsAt': F.Timestamp.fromMillis(1234567).toMillis() });
+    await F.updateDoc(ref, { updated: F.serverTimestamp(), 'vs.w': F.increment(5) });
+    await F.updateDoc(ref, { 'vs.w': F.increment(7), vsAt: F.Timestamp.fromMillis(1234567).toMillis() });
     const d = (await F.getDoc(ref)).data();
     expect(d.updated).toBeInstanceOf(F.Timestamp);
     expect(Math.abs(d.updated.toMillis() - arena.backend.now())).toBeLessThan(1500);
     expect(d.updated.toMillis() - Date.now()).toBeGreaterThan(3500e3);
-    expect(d.progress.xp).toBe(12); expect(d.progress.vsAt).toBe(1234567);
+    expect(d.vs.w).toBe(12); expect(d.vsAt).toBe(1234567);
     expect(F.Timestamp.fromMillis(1500.0).seconds).toBe(1);
     expect(() => F.updateDoc(c.ref('players', c.uid), { nick: undefined })).toThrow(/undefined/);         // real SDK rejects undefined
     await expectCode(F.updateDoc(c.ref('matches', 'NOTHER'), { a: 1 }), 'not-found');

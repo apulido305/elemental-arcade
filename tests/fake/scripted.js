@@ -50,12 +50,13 @@ export class ScriptedClient {
     await this.F.setDoc(this.ref('players', cred.user.uid), Object.assign(EMPTY_PROFILE(), { nick: this.nick, cls: this.cls, updated: this.F.serverTimestamp() }));
     return cred.user;
   }
-  /** An account exactly as pre-Binder Elemental made it: the legacy email scheme and one doc holding 'progress'. */
+  /** An account exactly as pre-Binder Elemental made it: the legacy email scheme and one doc holding 'progress'. Such docs
+   *  already exist; the rules no longer let anyone write a new 'progress' map (it is frozen), so the doc is seeded. */
   async legacySignUp(cls, nick, pin = '1234', progress = {}, icon = 'atom') {
     this.cls = norm(cls); this.nick = norm(nick);
     await this.A.setPersistence(this.auth, this.A.browserLocalPersistence);
     const cred = await this.A.createUserWithEmailAndPassword(this.auth, LEGACY.email(cls, nick), LEGACY.pass(pin, cls));
-    await this.F.setDoc(this.ref('players', cred.user.uid), { progress: Object.assign({ owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: B.VS0(), vsAt: 0 }, progress), nick: this.nick, cls: this.cls, icon, updated: this.F.serverTimestamp() });
+    this.backend.adminSet('players/' + cred.user.uid, { progress: Object.assign({ owned: {}, miss: {}, stars: {}, xp: 0, rounds: 0, best: 0, vs: B.VS0(), vsAt: 0 }, progress), nick: this.nick, cls: this.cls, icon, updated: { __ts: this.backend.now() } });
     return cred.user;
   }
   async signIn(cls, nick, pin = '1234') {

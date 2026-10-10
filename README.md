@@ -18,7 +18,7 @@ Elemental Arcade and its biology sibling [Cell Arcade](https://apulido305.github
 - **Shared files.** `binder.js` and `firestore.rules` must stay byte for byte the same in both repos. Change them in both, bump `BINDER_VERSION` (and `?v=` on the script tag), run `node tools/sync-rules.mjs` in Cell Arcade, and republish the rules.
 - **Card ids never change** (`el1`, `cat3`, `iso12`, no game prefix), and neither do icon ids (`atom`, `cat`, `cat-gold`). Other games' ids carry their prefix (`bio:org3`, `bio:frog`).
 
-**Transition (pre-Binder saves).** Before the Binder, Elemental saved one doc, `/players/{uid}` = `{progress, nick, cls, icon, updated}`. The Binder reads that `progress` map as Elemental's cards plus the account half, and while a doc has one, every save mirrors XP, unlocks, finishes and the daily-pack claim back into it. An old copy of the page still open on some phone therefore keeps working and loses nothing. Never delete `progress` by hand. Once every student has the new page, a later `BINDER_VERSION` can retire the mirror and the matching transition rules.
+**Pre-Binder saves.** Before the Binder, Elemental saved one doc, `/players/{uid}` = `{progress, nick, cls, icon, updated}`. The Binder still reads that `progress` map as Elemental's cards plus the account half, so nobody loses anything. Since `BINDER_VERSION 5` the map is **frozen**: it stays on the doc unchanged, but the rules refuse any edit, so a very old copy of the page that is somehow still open can no longer save (it shows "offline" until refreshed). Never delete `progress` by hand; nothing needs to be migrated.
 
 
 ## Turn on sign-in and saved binders (Firebase, free tier)
@@ -37,13 +37,13 @@ Until you do this, the game works as a guest and saves only in each browser.
 
 Students make an account with a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase (`{class}_{nick}@players.arcade.example`, the same in every arcade game), so no real email or name is stored. Each student can read and write only their own save.
 
-Accounts made before the Binder keep Elemental's original made-up email (`…@players.elemental-arcade.example`). Sign-in tries the shared scheme first, then the original one, so nobody has to do anything. On New account, the game first tries the original scheme with the class code, nickname and PIN given: if that account exists, the student is signed in to it (and told so) instead of getting a second account.
+Accounts made before the Binder keep Elemental's original made-up email (`…@players.elemental-arcade.example`). Sign-in tries the shared scheme first, then the original one, so nobody has to do anything. On New account, the game first tries the original scheme with the class code, nickname and PIN given: if that account exists, the student is signed in to it (and told so) instead of getting a second account. If that account exists with a **different** PIN, the nickname is taken and sign-up is refused ("That nickname is taken. Pick another, or use Sign in if it is yours."), so nobody ends up with two accounts.
 
 Signing in needs only the nickname and PIN. At sign-up the game stores `/names/{nickname}` with the class code, and sign-in looks it up. Nicknames are therefore unique across all classes for new accounts.
 
 - Anyone can invent a class code. It is shown on the account screen.
 - Accounts made before the lookup existed are asked for their class code once. After that sign-in, the nickname is claimed and the class code is not needed again. (A student already signed in on a device claims it on their next visit.)
-- Accounts made in Cell Arcade are asked for their class code the first time they sign in here, which claims the nickname.
+- Cell Arcade uses the same lookup and claims the nickname at sign-up too, so its accounts sign in here with nickname and PIN. An older Cell Arcade account without a claim is asked for its class code once.
 - The `/names` rule accepts both account schemes; it is part of the shared `firestore.rules`.
 - There is no PIN reset. To let a student start over, delete their user under Authentication > Users and their document under Firestore > players.
 - Tell students to use a nickname, not their real name.

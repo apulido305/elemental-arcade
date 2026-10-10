@@ -209,6 +209,12 @@ function createAuth(ctx) {
     async signInAnonymously() {
       await state.ready; const r = await authCall('auth.signInAnon', {}); set(r.user, r.token); return { user: auth.currentUser, providerId: null, operationType: 'signIn' };
     },
+    // deleteUser(user): only the signed-in user can delete itself (as in the real SDK after a recent sign-in).
+    async deleteUser(user) {
+      await state.ready;
+      if (!state.user || !user || user.uid !== state.user.uid) throw new FirebaseError('auth/requires-recent-login', 'Sign in again first.');
+      await authCall('auth.deleteUser', {}); set(null, null);
+    },
     async signOut() {
       await state.ready; const t = state.token;
       if (t) { try { await transport.call('auth.signOut', {}, t); } catch (e) { /* offline: still sign out locally */ } }

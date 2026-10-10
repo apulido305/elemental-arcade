@@ -43,6 +43,14 @@ export class Backend {
       this._relisten(token);
       return {};
     }
+    if (op === 'auth.deleteUser') {
+      const uid = this.tokens.get(token), u = uid && this.users.get(uid);
+      if (!u) throw new FirebaseError('auth/user-token-expired', 'The user is not signed in.');
+      this.users.delete(uid); if (u.email) this.byEmail.delete(u.email);
+      for (const [t, id] of [...this.tokens]) if (id === uid) this.tokens.delete(t);
+      this._relisten(token);
+      return {};
+    }
     if (op === 'auth.signInAnon') {
       if (!this.anonymousEnabled) throw new FirebaseError('auth/admin-restricted-operation', 'This operation is restricted to administrators only.');
       const cur = this.authFor(token);

@@ -15,7 +15,7 @@
    It does not import Firebase: cloud.js loads the SDK and hands it over with Binder.init({F, db}). */
 (function (root) {
   'use strict';
-  const BINDER_VERSION = 3;
+  const BINDER_VERSION = 5;
 
   // ---------- registry ----------
   // id: short game id, also the card-id prefix ('bio:org3') and the icon-id prefix ('bio:frog').
@@ -181,21 +181,9 @@
     if (isObj(profile && profile.progress)) out.chem = mergeGame(pick(out.chem || {}, GAME_KEYS), pick(profile.progress, GAME_KEYS));
     return out;
   }
-  /* TRANSITION (until every game saves through the Binder): pre-Binder Elemental writes its whole player doc as
-     {progress, nick, cls, icon, updated}, which erases the profile's top-level keys. So while a doc has 'progress':
-     - the account half is mirrored into progress (xp, unlocked, finishes, finishOn, packLog), which Elemental merges
-       and keeps (max for xp, unions for the rest), so Elemental also sees XP and the daily-pack claim;
-     - unopened packs are copied into the saving game's own doc (Elemental never touches it), because Elemental's pack
-       screen cannot open another game's packs;
-     - the 'progress' map itself is never dropped.
-     loadBinder folds all of it back together. design/binder-spec.md, "Sharing elemental-arc". */
-  function mirrorLegacy(progress, acc) {
-    return Object.assign({}, progress, {
-      xp: Math.max(+progress.xp || 0, acc.xp || 0), unlocked: uni(progress.unlocked, acc.unlocked).filter(id => UNLOCKABLE.includes(id)),
-      finishes: mergeFin(progress.finishes, acc.finishes), finishOn: Object.assign({}, isObj(progress.finishOn) ? progress.finishOn : {}, acc.finishOn || {}),
-      packLog: uni(progress.packLog, acc.packLog)
-    });
-  }
+  /* A pre-Binder Elemental doc's 'progress' map is FROZEN (the transition is retired, BINDER_VERSION 5): it is never
+     written or mirrored any more, only read (foldLegacy, legacyGames) and carried along unchanged when the profile is
+     saved, because the rules let it stay but never change. Nothing deletes it. */
 
   // ---------- guests (localStorage, no account) ----------
   const GUEST_KEY = 'arcade-v1';
@@ -210,10 +198,18 @@
     const all = guestAll(), p = all.profile;
     return Object.assign(joinProgress(all.games[gameId] || {}, p), { icon: p.icon || null, iconAt: +p.iconAt || 0 });
   }
+  // The account half is shared by every game on this origin, and two games can be open in two tabs at once, so it is
+  // merged with what is stored (as the cloud does), never overwritten. This game's own blob is written as is (only this
+  // game writes it, and Review Room clears must be able to lower a miss count). The icon: the later pick wins.
   function guestSave(gameId, progress, meta) {
-    const all = guestAll(), sp = splitProgress(progress || {});
+    const all = guestAll(), sp = splitProgress(progress || {}), was = all.profile;
     all.games[gameId] = sp.game;
-    all.profile = Object.assign({}, all.profile, sp.account, meta && meta.icon ? { icon: meta.icon, iconAt: +meta.iconAt || 0 } : {});
+    const icon = meta && meta.icon && (+meta.iconAt || 0) >= (+was.iconAt || 0) ? { icon: meta.icon, iconAt: +meta.iconAt || 0 } : pick(was, ['icon', 'iconAt']);
+    const acc = mergeAccount(pick(was, ACCOUNT_KEYS), sp.account);
+    // finishOn: this game may turn its own cards' finish off (drop the key); other games' entries are kept.
+    const mine = k => (GAMES[gameId] && GAMES[gameId].legacyIds) ? k.indexOf(':') < 0 : k.indexOf(gameId + ':') === 0;
+    acc.finishOn = Object.assign({}, ...Object.keys(acc.finishOn).filter(k => !mine(k) || k in sp.account.finishOn).map(k => ({ [k]: acc.finishOn[k] })));
+    all.profile = Object.assign({}, was, acc, icon);
     try { const s = store(); if (s) s.setItem(GUEST_KEY, JSON.stringify(all)); } catch (e) { /* storage full or blocked */ }
   }
   function guestClear(gameId) {
@@ -266,18 +262,16 @@
           const ps = await tx.get(pref(uid));
           const prof = ps.exists() ? ps.data() : {};
           let acc = foldLegacy(prof, cache.games), icon = prof.icon || null;
-          const legacy = isObj(prof.progress);
           const sps = jobs.map(([g, job]) => [g, job, splitProgress(job.progress)]);
           sps.forEach(([g, job, sp]) => { acc = mergeAccount(acc, sp.account); icon = mergeIcon(prof, job.meta, acc.unlocked, icon); });
           for (const [g, , sp] of sps) {
             const game = mergeGame(pick(cache.games[g] || {}, GAME_KEYS), sp.game);
-            if (legacy) game.packs = acc.packs;   // transition: unopened packs also live where pre-Binder Elemental cannot erase them
             tx.set(gref(uid, g), Object.assign({}, game, { updated: F.serverTimestamp() }));
             wrote[g] = game;
           }
           out = Object.assign({ nick: prof.nick || (who && who.nick), cls: prof.cls || (who && who.cls) }, acc, { level: levelOf(acc.xp), updated: F.serverTimestamp() });
           if (icon) out.icon = icon;
-          if (legacy) out.progress = mirrorLegacy(prof.progress, acc);
+          if (isObj(prof.progress)) out.progress = prof.progress;   // frozen: carried along unchanged, never edited or dropped
           tx.set(pref(uid), out);
         });
         cache.profile = Object.assign({}, out, { updated: Date.now() });
@@ -309,7 +303,35 @@
       cache = { uid, at: Date.now(), profile: Object.assign({}, profile, { updated: Date.now() }), games: { [gameId]: sp.game } };
       return { profile: cache.profile, game: sp.game };
     }
-    return { loadBinder, saveGame, flush, setUser, createAccount, onStatus: cb => statusCbs.push(cb), _cache: () => cache };
+    // Nickname -> class code (/names/{nick}), so a game can sign in with nickname + PIN only. A missing name (an account
+    // made before the lookup) means the student types the class code once; signing in then claims it. Never throws.
+    const nameRef = n => F.doc(db, 'names', norm(n));
+    async function lookupCls(nick) { try { const s = await F.getDoc(nameRef(nick)); return s.exists() ? s.data().cls : null; } catch (e) { return null; } }
+    const claimed = new Set();
+    async function claimName(user) {
+      if (!user || user.isAnonymous || !user.email || claimed.has(user.uid)) return;
+      claimed.add(user.uid);
+      const { cls, nick } = whoFromEmail(user.email);
+      try { if (!(await F.getDoc(nameRef(nick))).exists()) await F.setDoc(nameRef(nick), { cls, uid: user.uid }); } catch (e) { /* taken, or offline */ }
+    }
+    return { loadBinder, saveGame, flush, setUser, createAccount, lookupCls, claimName, onStatus: cb => statusCbs.push(cb), _cache: () => cache };
+  }
+
+  /* Sign-up guard against duplicate accounts. A pre-Binder account (legacy scheme) has no /names claim and a different
+     email from the Binder scheme, so neither the name lookup nor Firebase would stop a second account with the same
+     class code and nickname. Firebase will not say whether an email exists (email enumeration protection), so this
+     tries to CREATE the legacy email with a random password: 'email-already-in-use' means taken; success means free,
+     and that throwaway user is deleted at once. A: the firebase-auth module (needs createUserWithEmailAndPassword and
+     deleteUser). Leaves no one signed in. Throws on network errors, like the sign-up it guards. */
+  async function legacyTaken(A, auth, cls, nick) {
+    for (const l of LEGACY_SCHEMES) {
+      const pass = 'probe-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      let cred;
+      try { cred = await A.createUserWithEmailAndPassword(auth, l.email(cls, nick), pass); }
+      catch (e) { if (/email-already-in-use/.test(String(e && e.code))) return true; throw e; }
+      for (let t = 0; t < 3; t++) { try { await A.deleteUser(cred.user); break; } catch (e) { /* retry */ } }
+    }
+    return false;
   }
 
   // Card data of any game (its published cards.json), cached per page. Resolves null when unreachable.
@@ -327,11 +349,12 @@
   const api = {
     BINDER_VERSION, GAMES, registerGame, current,
     ICON_SETS, BANDS, FREE_ICONS, PACK_ICONS, GOLD_ICONS, UNLOCKABLE, ICON_META, isGold, baseOf, iconKnown, iconGame, iconName, iconLabel, iconBand, iconSrc, iconOwned,
-    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames, mirrorLegacy,
+    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames,
     ACCOUNT_KEYS, GAME_KEYS, GAME_LEGACY_KEYS, PROFILE_KEYS, VS0, emptyGame, emptyAccount, levelOf, splitProgress, joinProgress,
     mergeGame, mergeAccount, mergeVs, mergeIcon, foldLegacy, toMs,
     GUEST_KEY, guestAll, guestLoad, guestSave, guestClear, guestCount, _setStorage: s => { STORE = s; },
     loadCards,
+    legacyTaken,
     createBinder,
     init(env) { DEF = createBinder(env); return DEF; },
     loadBinder: uid => need().loadBinder(uid),
@@ -339,6 +362,8 @@
     flush: () => (DEF ? DEF.flush() : Promise.resolve()),
     setUser: u => need().setUser(u),
     createAccount: (...a) => need().createAccount(...a),
+    lookupCls: n => (DEF ? DEF.lookupCls(n) : Promise.resolve(null)),
+    claimName: u => (DEF ? DEF.claimName(u) : Promise.resolve()),
     onStatus: cb => need().onStatus(cb)
   };
   root.Binder = api;

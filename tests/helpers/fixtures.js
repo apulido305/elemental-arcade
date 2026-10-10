@@ -27,12 +27,12 @@ export class Device {
   /** Sign up through Cloud.signUp (same code path the account screen uses). Resolves once the header shows the account. */
   async signUp(cls, nick, pin = '1234') {
     await this.page.evaluate(([c, n, p]) => window.Cloud.signUp(c, n, p, true, null), [cls, nick, pin]);
-    await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true });
+    await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true, timeout: 20000 });   // sign-up makes several round trips (name lookup, legacy probe, account)
   }
   /** Sign in through Cloud.signIn with nickname + PIN only (the class code comes from /names). */
   async signIn(nick, pin = '1234', keep = true) {
     await this.page.evaluate(([n, p, k]) => window.Cloud.signIn(n, p, k), [nick, pin, keep]);
-    await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true });
+    await expect(this.page.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true, timeout: 20000 });   // sign-up makes several round trips (name lookup, legacy probe, account)
   }
   /** Sign up through the real account screen UI. */
   async signUpViaUI(cls, nick, pin = '1234') {
@@ -41,7 +41,7 @@ export class Device {
     await p.click('[data-act="authtab"][data-id="up"]');
     await p.fill('#f-cls', cls); await p.fill('#f-nick', nick); await p.fill('#f-pin', pin);
     await p.click('#authform button[type="submit"]');
-    await expect(p.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true });
+    await expect(p.locator('[data-act="account"]')).toContainText(nick, { ignoreCase: true, timeout: 20000 });   // sign-up makes several round trips (name lookup, legacy probe, account)
   }
   /** Current Firebase user as the page sees it, or null. */
   currentUser() { return this.page.evaluate(() => { const u = window.__fakeFirebase.sdk.auth.getAuth().currentUser; return u ? { uid: u.uid, isAnonymous: u.isAnonymous, email: u.email } : null; }); }

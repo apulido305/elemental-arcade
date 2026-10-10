@@ -33,17 +33,10 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
   const who = u => B.whoFromEmail(u.email);
   const badCred = e => /invalid-credential|user-not-found|wrong-password|invalid-login/.test(String(e && e.code));
 
-  // Nickname lookup. Missing (account made before the lookup, or made in another arcade game) means the student must
-  // type their class code once; signing in with it then claims the name. Best effort, never throws.
-  const nameRef = n => F.doc(db, 'names', n);
-  async function lookupCls(n) { try { const s = await F.getDoc(nameRef(n)); return s.exists() ? s.data().cls : null; } catch (e) { return null; } }
-  const claimed = new Set();
-  async function claimName(u) {
-    if (!u || u.isAnonymous || claimed.has(u.uid)) return;
-    claimed.add(u.uid);
-    const { cls, nick } = who(u);
-    try { if (!(await F.getDoc(nameRef(nick))).exists()) await F.setDoc(nameRef(nick), { cls, uid: u.uid }); } catch (e) { /* taken or old rules */ }
-  }
+  // Nickname lookup and claim live in binder.js (shared with every game). Missing (an account made before the lookup)
+  // means the student types their class code once; signing in with it then claims the name. Never throws.
+  const lookupCls = n => B.lookupCls(n), claimName = u => B.claimName(u);
+  const taken = () => { const e = new Error('nickname taken'); e.code = 'auth/email-already-in-use'; return e; };
 
   const changeCbs = [], statusCbs = [];
   let last = null, busy = false, view = null;
@@ -103,16 +96,19 @@ const configured = firebaseConfig && firebaseConfig.apiKey && !/YOUR_/.test(fire
         try { await A.signInWithEmailAndPassword(auth, k.email, k.pass); return 'existing'; } catch (e) { /* no such legacy account (or another PIN) */ }
       }
       // Nicknames are unique across classes, since sign-in has no class code.
-      if (await lookupCls(n)) { const e = new Error('nickname taken'); e.code = 'auth/email-already-in-use'; throw e; }
+      if (await lookupCls(n)) throw taken();
       busy = true;
       try {
+        // A pre-Binder account with this class code and nickname but another PIN has no /names claim: without this
+        // check it would get a second, Binder-scheme account (binder-spec "Accounts").
+        if (await B.legacyTaken(A, auth, c, n)) throw taken();
         const cred = await A.createUserWithEmailAndPassword(auth, B.accountEmail(c, n), B.accountPass(pin, c));
         B.setUser({ uid: cred.user.uid, nick: n, cls: c });
         const made = await B.createAccount(cred.user.uid, { nick: n, cls: c }, GAME, initial || {}, icon);
         view = { profile: made.profile, games: { [GAME]: made.game } };
+        await claimName(cred.user);   // before the account shows, so an immediate second sign-up already sees the name taken
         busy = false;
         emit({ cls: c, nick: n }, progOf(view), { icon: made.profile.icon || null, updated: Date.now() });
-        await claimName(cred.user);
       } finally { busy = false; }
     },
     // cls is optional: without it the class code comes from /names (throws auth/need-class-code if it is not there).

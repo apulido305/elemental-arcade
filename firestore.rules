@@ -109,15 +109,6 @@ service cloud.firestore {
         && (!('finishOn' in d) || (d.finishOn is map && d.finishOn.values().hasOnly(['foil', 'holo', 'night', 'ember'])));
     }
 
-    // Elemental's pre-Binder progress map (its original rule, unchanged apart from the shared icon list).
-    function legacyProgressOk(p) {
-      return p is map
-        && p.keys().hasOnly(['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'])
-        && packDataOk(p)
-        && (!('vs' in p) || (p.vs is map && p.vs.keys().hasOnly(['w', 'l', 'streak', 'best', 'played'])))
-        && (!('vsAt' in p) || p.vsAt is number);
-    }
-
     // ---------------------------------------------------------------------------------------------
     // /players/{uid}: the account-wide profile. Each signed-in student reads and writes only their own.
     // Anonymous guests never read or write here (guests have no stored progress).
@@ -125,8 +116,8 @@ service cloud.firestore {
     //   icon             profile icon id (account-wide)
     //   xp, level        account-wide experience; level is derived from xp (binder.js levelOf)
     //   unlocked, finishes, finishOn, packs, packLog   everything packs touch (account-wide)
-    //   progress         TRANSITION: a pre-Binder Elemental save ({progress, nick, cls, icon, updated}). Elemental
-    //                    still writes it until it saves through the Binder, so it keeps Elemental's own checks.
+    //   progress         A pre-Binder Elemental save, FROZEN (the transition is retired): it may stay on a doc that
+    //                    already has it, unchanged, so nothing is deleted, but it can never be created or edited.
     // ---------------------------------------------------------------------------------------------
     match /players/{uid} {
       allow read: if isAccount() && request.auth.uid == uid;
@@ -138,7 +129,8 @@ service cloud.firestore {
         && (!('xp' in request.resource.data) || (request.resource.data.xp is number && request.resource.data.xp >= 0))
         && (!('level' in request.resource.data) || (request.resource.data.level is int && request.resource.data.level >= 1))
         && packDataOk(request.resource.data)
-        && (!('progress' in request.resource.data) || legacyProgressOk(request.resource.data.progress));
+        && (!('progress' in request.resource.data)
+            || (resource != null && 'progress' in resource.data && request.resource.data.progress == resource.data.progress));
       allow delete: if false;
 
       // -------------------------------------------------------------------------------------------
