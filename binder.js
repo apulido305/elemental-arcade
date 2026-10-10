@@ -15,7 +15,7 @@
    It does not import Firebase: cloud.js loads the SDK and hands it over with Binder.init({F, db}). */
 (function (root) {
   'use strict';
-  const BINDER_VERSION = 5;
+  const BINDER_VERSION = 6;
 
   // ---------- registry ----------
   // id: short game id, also the card-id prefix ('bio:org3') and the icon-id prefix ('bio:frog').
@@ -103,18 +103,20 @@
     .concat(LEGACY_SCHEMES.map(l => ({ email: l.email(cls, nick), pass: l.pass(pin, cls), legacy: l.game })));
 
   // ---------- data shapes ----------
-  // Account-wide (profile doc, guest 'profile'): XP and level, the icon, and everything packs touch.
-  const ACCOUNT_KEYS = ['xp', 'unlocked', 'finishes', 'finishOn', 'packs', 'packLog'];
-  // Per game (games/{gameId} doc, guest 'games'[gameId]): what this game's binder, rooms and VS record need.
-  const GAME_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt'];
+  // Account-wide (profile doc, guest 'profile'): the icon and everything packs touch.
+  const ACCOUNT_KEYS = ['unlocked', 'finishes', 'finishOn', 'packs', 'packLog'];
+  // Per game (games/{gameId} doc, guest 'games'[gameId]): what this game's binder, rooms and VS record need, and its XP
+  // (BINDER_VERSION 6: each game has its own XP and level).
+  const GAME_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'xp'];
   // The rules also accept these legacy keys in a game doc (Elemental's PROG shape), so a migration can copy a whole
   // Elemental save in. loadBinder folds them into the profile; saveGame never writes them to a game doc.
   const GAME_LEGACY_KEYS = ['packs', 'finishes', 'finishOn', 'unlocked', 'packLog'];
-  const PROFILE_KEYS = ['nick', 'cls', 'icon', 'xp', 'level', 'updated'].concat(ACCOUNT_KEYS.filter(k => k !== 'xp'));
+  // 'xp' and 'level' on a profile are LEGACY (see legacyXp): never written again, carried along unchanged.
+  const PROFILE_KEYS = ['nick', 'cls', 'icon', 'xp', 'level', 'updated'].concat(ACCOUNT_KEYS);
   const VS0 = () => ({ w: 0, l: 0, streak: 0, best: 0, played: 0 });
-  const emptyGame = () => ({ owned: {}, miss: {}, stars: {}, rounds: 0, best: 0, vs: VS0(), vsAt: 0 });
-  const emptyAccount = () => ({ xp: 0, unlocked: [], finishes: {}, finishOn: {}, packs: [], packLog: [] });
-  // Level from XP: level L needs 100*L XP to clear. Same curve in every game, so the level is account-wide too.
+  const emptyGame = () => ({ owned: {}, miss: {}, stars: {}, rounds: 0, best: 0, vs: VS0(), vsAt: 0, xp: 0 });
+  const emptyAccount = () => ({ unlocked: [], finishes: {}, finishOn: {}, packs: [], packLog: [] });
+  // Level from a game's XP: level L needs 100*L XP to clear. Same curve in every game; each game has its own level.
   function levelOf(xp) { let L = 1, x = +xp || 0; while (x >= 100 * L) { x -= 100 * L; L++; } return L; }
   const pick = (o, ks) => { const r = {}; ks.forEach(k => { if (o && o[k] !== undefined) r[k] = o[k]; }); return r; };
   // A game's whole in-memory progress (Elemental's S) split into the two halves the Binder stores.
@@ -137,7 +139,7 @@
     a = a || {}; b = b || {};
     return { owned: maxObj(a.owned, b.owned), miss: maxObj(a.miss, b.miss), stars: maxObj(a.stars, b.stars),
       rounds: Math.max(a.rounds || 0, b.rounds || 0), best: Math.max(a.best || 0, b.best || 0),
-      vs: mergeVs(a, b), vsAt: Math.max(a.vsAt || 0, b.vsAt || 0) };
+      vs: mergeVs(a, b), vsAt: Math.max(a.vsAt || 0, b.vsAt || 0), xp: Math.max(+a.xp || 0, +b.xp || 0) };
   }
   const mergeFin = (a, b) => { const o = {}; [a, b].forEach(m => { if (isObj(m)) for (const k in m) o[k] = uni(o[k], m[k]); }); return o; };
   // Unopened packs: the union by id, minus any pack either side opened ('open:' + id in packLog).
@@ -152,7 +154,7 @@
   function mergeAccount(a, b) {
     a = a || {}; b = b || {};
     const packLog = uni(a.packLog, b.packLog);
-    return { xp: Math.max(a.xp || 0, b.xp || 0), unlocked: uni(a.unlocked, b.unlocked).filter(id => UNLOCKABLE.includes(id)),
+    return { unlocked: uni(a.unlocked, b.unlocked).filter(id => UNLOCKABLE.includes(id)),
       finishes: mergeFin(a.finishes, b.finishes), finishOn: Object.assign({}, isObj(a.finishOn) ? a.finishOn : {}, isObj(b.finishOn) ? b.finishOn : {}),
       packs: mergePacks(a.packs, b.packs, packLog), packLog };
   }
@@ -175,10 +177,18 @@
     Object.keys(games || {}).forEach(g => { const leg = pick(games[g], GAME_LEGACY_KEYS); if (Object.keys(leg).length) acc = mergeAccount(acc, leg); });
     return acc;
   }
-  // A pre-Binder Elemental player doc keeps Elemental's progress in 'progress': that is Elemental's game doc.
+  /* LEGACY XP. Until BINDER_VERSION 6 XP was account-wide (profile 'xp', and 'xp' in a pre-Binder 'progress' map), so
+     nobody can tell which game earned it. All of it belongs to Elemental (LEGACY_XP_GAME), the older game; every other
+     game starts at 0. The old value is frozen (never written again), so taking the max with it on every load is safe. */
+  const LEGACY_XP_GAME = 'chem';
+  const legacyXp = profile => Math.max(+(profile && profile.xp) || 0, +(profile && isObj(profile.progress) && profile.progress.xp) || 0);
+  // Every game doc, plus what legacy places hold for Elemental: a pre-Binder player doc keeps Elemental's progress in
+  // 'progress' (that is Elemental's game doc), and the legacy account XP.
   function legacyGames(profile, games) {
     const out = Object.assign({}, games || {});
     if (isObj(profile && profile.progress)) out.chem = mergeGame(pick(out.chem || {}, GAME_KEYS), pick(profile.progress, GAME_KEYS));
+    const lx = legacyXp(profile), g = LEGACY_XP_GAME;
+    if (lx > 0) out[g] = Object.assign({}, out[g] || {}, { xp: Math.max(+(out[g] || {}).xp || 0, lx) });
     return out;
   }
   /* A pre-Binder Elemental doc's 'progress' map is FROZEN (the transition is retired, BINDER_VERSION 5): it is never
@@ -193,10 +203,11 @@
     try { const s = store(); const raw = s && s.getItem(GUEST_KEY); if (raw) { const g = JSON.parse(raw); if (isObj(g)) return { profile: isObj(g.profile) ? g.profile : {}, games: isObj(g.games) ? g.games : {} }; } } catch (e) { /* blocked or corrupt */ }
     return { profile: {}, games: {} };
   }
-  // This game's progress joined with the account half, plus the guest's icon.
+  // This game's progress joined with the account half, plus the guest's icon. A guest profile's 'xp' is legacy, as on
+  // an account (it goes to Elemental).
   function guestLoad(gameId) {
     const all = guestAll(), p = all.profile;
-    return Object.assign(joinProgress(all.games[gameId] || {}, p), { icon: p.icon || null, iconAt: +p.iconAt || 0 });
+    return Object.assign(joinProgress(legacyGames(pick(p, ['xp']), all.games)[gameId] || {}, p), { icon: p.icon || null, iconAt: +p.iconAt || 0 });
   }
   // The account half is shared by every game on this origin, and two games can be open in two tabs at once, so it is
   // merged with what is stored (as the cloud does), never overwritten. This game's own blob is written as is (only this
@@ -214,8 +225,9 @@
   }
   function guestClear(gameId) {
     const all = guestAll(); delete all.games[gameId];
-    // the account half moves with the game that signed up (it is account-wide); other games keep their cards
-    all.profile = pick(all.profile, ['icon', 'iconAt']);
+    // the account half moves with the game that signed up (it is account-wide); other games keep their cards and XP,
+    // and the legacy XP stays for Elemental unless Elemental is the one signing up
+    all.profile = pick(all.profile, gameId === LEGACY_XP_GAME ? ['icon', 'iconAt'] : ['icon', 'iconAt', 'xp']);
     try { const s = store(); if (s) s.setItem(GUEST_KEY, JSON.stringify(all)); } catch (e) { /* ignore */ }
   }
   const guestCount = gameId => { const g = guestAll().games[gameId]; return g && isObj(g.owned) ? Object.keys(g.owned).filter(k => g.owned[k] > 0).length : 0; };
@@ -237,8 +249,8 @@
       gs.forEach(d => { games[d.id] = d.data(); });
       cache = { uid, at: Date.now(), profile, games };
       const acc = foldLegacy(profile || {}, games), all = legacyGames(profile, games);
-      const out = { profile: profile ? Object.assign({}, profile, acc, { level: levelOf(acc.xp) }) : null, games: {} };
-      if (out.profile) delete out.profile.progress;
+      const out = { profile: profile ? Object.assign({}, profile, acc) : null, games: {} };
+      if (out.profile) { delete out.profile.progress; delete out.profile.xp; delete out.profile.level; }   // legacy: XP is per game now
       Object.keys(all).forEach(g => { out.games[g] = Object.assign(emptyGame(), pick(all[g], GAME_KEYS)); });
       return out;
     }
@@ -265,12 +277,13 @@
           const sps = jobs.map(([g, job]) => [g, job, splitProgress(job.progress)]);
           sps.forEach(([g, job, sp]) => { acc = mergeAccount(acc, sp.account); icon = mergeIcon(prof, job.meta, acc.unlocked, icon); });
           for (const [g, , sp] of sps) {
-            const game = mergeGame(pick(cache.games[g] || {}, GAME_KEYS), sp.game);
+            const game = mergeGame(pick(legacyGames(prof, cache.games)[g] || {}, GAME_KEYS), sp.game);
             tx.set(gref(uid, g), Object.assign({}, game, { updated: F.serverTimestamp() }));
             wrote[g] = game;
           }
-          out = Object.assign({ nick: prof.nick || (who && who.nick), cls: prof.cls || (who && who.cls) }, acc, { level: levelOf(acc.xp), updated: F.serverTimestamp() });
+          out = Object.assign({ nick: prof.nick || (who && who.nick), cls: prof.cls || (who && who.cls) }, acc, { updated: F.serverTimestamp() });
           if (icon) out.icon = icon;
+          ['xp', 'level'].forEach(k => { if (prof[k] !== undefined) out[k] = prof[k]; });   // legacy XP: frozen, carried along unchanged
           if (isObj(prof.progress)) out.progress = prof.progress;   // frozen: carried along unchanged, never edited or dropped
           tx.set(pref(uid), out);
         });
@@ -284,7 +297,7 @@
         setStatus('offline');
       }
     }
-    // progress: the game's whole in-memory progress (game keys plus xp, unlocked, finishes, finishOn, packs, packLog).
+    // progress: the game's whole in-memory progress (game keys incl. xp, plus unlocked, finishes, finishOn, packs, packLog).
     // meta: {icon, iconAt} (iconAt = when the icon was picked on this device, 0 if not picked here).
     function saveGame(gameId, progress, meta) {
       pending[gameId] = { progress: JSON.parse(JSON.stringify(progress || {})), meta: meta || null };
@@ -294,7 +307,7 @@
     async function createAccount(uid, ident, gameId, progress, icon) {
       const sp = splitProgress(progress || {});
       const b = F.writeBatch(db);
-      const profile = Object.assign({ nick: norm(ident.nick), cls: norm(ident.cls) }, sp.account, { level: levelOf(sp.account.xp), updated: F.serverTimestamp() });
+      const profile = Object.assign({ nick: norm(ident.nick), cls: norm(ident.cls) }, sp.account, { updated: F.serverTimestamp() });
       const ic = mergeIcon(null, { icon, iconAt: 1 }, sp.account.unlocked, null);
       if (ic) profile.icon = ic;
       b.set(pref(uid), profile);
@@ -349,7 +362,7 @@
   const api = {
     BINDER_VERSION, GAMES, registerGame, current,
     ICON_SETS, BANDS, FREE_ICONS, PACK_ICONS, GOLD_ICONS, UNLOCKABLE, ICON_META, isGold, baseOf, iconKnown, iconGame, iconName, iconLabel, iconBand, iconSrc, iconOwned,
-    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames,
+    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames, LEGACY_XP_GAME, legacyXp,
     ACCOUNT_KEYS, GAME_KEYS, GAME_LEGACY_KEYS, PROFILE_KEYS, VS0, emptyGame, emptyAccount, levelOf, splitProgress, joinProgress,
     mergeGame, mergeAccount, mergeVs, mergeIcon, foldLegacy, toMs,
     GUEST_KEY, guestAll, guestLoad, guestSave, guestClear, guestCount, _setStorage: s => { STORE = s; },

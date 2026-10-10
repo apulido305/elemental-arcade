@@ -523,7 +523,7 @@ a.btn{text-decoration:none}
 <div id="vs" hidden></div>
 
 <!-- The shared Binder (binder.js, the same file in every arcade game) is a classic script so the game below can use it synchronously. -->
-<script src="binder.js?v=5"></script>
+<script src="binder.js?v=6"></script>
 <script>
 /* ---------- card data (tools/export-cards.mjs exports from here to "profile icons" as cards.json) ---------- */
 const GAME='chem';
@@ -642,7 +642,7 @@ const iconSVG=(id,size,o)=>{o=o||{};id=iconAny(id);const g=isGold(id),svg=!g&&IC
 const KEY='elemental-arcade-v1';   // the pre-Binder guest save (moved into 'arcade-v1' on first load); also prefixes device flags
 const OLD_PKEY=KEY+'-prefs';
 const PKEY='arcade-v1-prefs:'+GAME;
-// owned, miss, stars, rounds, best, vs, vsAt (this game) + xp, unlocked, finishes, finishOn, packs, packLog (account-wide)
+// owned, miss, stars, rounds, best, vs, vsAt, xp (this game) + unlocked, finishes, finishOn, packs, packLog (account-wide)
 const PROG=Binder.GAME_KEYS.concat(Binder.ACCOUNT_KEYS);
 const PROG_ARR=['packs','unlocked','packLog'];   // list-shaped progress keys (the rest are maps or numbers)
 const VS0=Binder.VS0;
@@ -1135,25 +1135,34 @@ function rollPack(seed,week,have){
   });
   return out;
 }
-// reason 'vs' (ref = match code), 'gold' (ref = card id) or 'day' (ref = date). Returns false if that reason already paid.
+// reason 'vs' (ref = match code), 'day' (ref = date), 'level' (ref = game:level) or 'gold' (ref = card id).
+// Returns false if that reason already paid.
 function earnPack(reason,ref){
   const id=reason+':'+ref;
   if(S.packLog.includes(id)||S.packs.some(p=>p.id===id))return false;
   const at=Date.now(),seed=(Math.random()*4294967296)>>>0,week=weekOf(at);
   const p={id,at,reason,seed,week,slots:rollPack(seed,week,packHave())};
-  if(reason==='vs')p.matchId=String(ref);else if(reason==='day')p.day=String(ref);else{p.cardId=String(ref);p.cardName=(BY[ref]||{}).name||''}
+  if(reason==='vs')p.matchId=String(ref);else if(reason==='day')p.day=String(ref);else if(reason==='level')p.level=+String(ref).split(':').pop();else{p.cardId=String(ref);p.cardName=(BY[ref]||{}).name||''}
   p.game=GAME;   // packs are account-wide: another game can open this one, and names its cards from these labels
   S.packs.push(p);S.packLog.push(id);save();
   toast('Pack earned! Open it from your binder.');
   const b=document.querySelector('[data-act="binder"]');if(b)b.outerHTML=binderBtnHTML();
   return true;
 }
+/* All XP goes through here. Each level this game reaches in play (a round, a VS match, a pack's XP) pays one pack.
+   Levels are per game, so the pack id names the game ('level:bio:5'): Elemental's level 5 is a different pack. Setting
+   S.xp directly pays nothing. Returns how many level packs it paid. */
+function gainXp(n){
+  const from=levelInfo(S.xp).lvl;S.xp+=n;const to=levelInfo(S.xp).lvl;
+  let paid=0;for(let L=from+1;L<=to;L++)if(earnPack('level',GAME+':'+L))paid++;
+  return paid;
+}
 // Add a pack's three rewards. Opened ids go into packLog, so another device's copy is dropped on merge.
 function applyPack(p){
   p.slots.forEach(x=>{
-    if(x.kind==='xp')S.xp+=x.xp;
+    if(x.kind==='xp')gainXp(x.xp);
     else if(x.kind==='finish'){const l=S.finishes[x.card]||(S.finishes[x.card]=[]);if(!l.includes(x.finish))l.push(x.finish);S.finishOn[x.card]=x.finish}
-    else if(S.unlocked.includes(x.icon))S.xp+=FALL_XP[2];   // unlocked meanwhile on another device: never a duplicate
+    else if(S.unlocked.includes(x.icon))gainXp(FALL_XP[2]);   // unlocked meanwhile on another device: never a duplicate
     else S.unlocked.push(x.icon);
   });
   S.packs=S.packs.filter(q=>q.id!==p.id);
@@ -1251,7 +1260,7 @@ function next(){
   V.perfect=correct===V.qs.length;
   V.stars=ratio>=.9?3:ratio>=.7?2:ratio>=.5?1:0;
   V.xpGain=V.score+(V.perfect?20:0);
-  V.lvBefore=levelInfo(S.xp).lvl;S.xp+=V.xpGain;V.lvAfter=levelInfo(S.xp).lvl;
+  V.lvBefore=levelInfo(S.xp).lvl;V.lvPacks=gainXp(V.xpGain);V.lvAfter=levelInfo(S.xp).lvl;
   const k=V.roomId+'|'+V.deckId;S.stars[k]=Math.max(S.stars[k]||0,V.stars);
   S.rounds++;S.best=Math.max(S.best,V.best);save();
   V.packReady=dailyPack();   // first finished round today: the daily pack
@@ -1357,7 +1366,7 @@ function nextStarHTML(){
 function resultsHTML(){
   const correct=V.res.filter(Boolean).length;
   const title=V.perfect?'Perfect round!':V.stars>=2?'Great round!':V.stars===1?'Good start':'Keep training';
-  const lv=V.lvAfter>V.lvBefore?'<div class="lvup">Level up! You are now Lv '+V.lvAfter+', '+esc(levelInfo(S.xp).title)+'.</div>':'';
+  const lv=V.lvAfter>V.lvBefore?'<div class="lvup">Level up! You are now Lv '+V.lvAfter+', '+esc(levelInfo(S.xp).title)+'.'+(V.lvPacks?' You earned '+(V.lvPacks===1?'a pack':V.lvPacks+' packs')+'.':'')+'</div>':'';
   const pw=Math.max(150,Math.min(240,Math.floor((Math.min(innerWidth,1080)-32-16)/2)));
   const pack=V.newIds.length?
     '<section><div class="sechead"><h2 class="h">New cards won</h2><div class="actions"><button class="btn small" data-act="flipall">Flip all</button><button class="btn ghost small" data-act="binder">See in binder</button></div></div><div class="pack" style="--pw:'+pw+'px">'+
@@ -1412,7 +1421,7 @@ function shelfHTML(){
     return '<button class="spine'+(gid===V.shelf?' on':'')+'" style="--sp:'+esc(g.color)+'" data-act="shelf" data-id="'+esc(gid)+'" aria-pressed="'+(gid===V.shelf)+'"><b>'+esc(g.title)+'</b><span>'+esc(g.subject||'')+'</span><em>'+n+(tot?'/'+tot:'')+' cards</em></button>'}).join('');
   const all=ids.reduce((a,g)=>a+countOwned(g),0),gold=ids.reduce((a,g)=>a+countGold(g),0);
   return '<div class="shelf" role="group" aria-label="Games in your Binder" data-ui="shelf">'+spines+'</div>'+
-    '<div class="totals" data-ui="totals"><span><b>'+all+'</b>cards in every game</span><span><b>'+gold+'</b>Gold Legend'+(gold===1?'':'s')+'</span><span><b>'+(levelInfo(S.xp).lvl)+'</b>account level</span></div>';
+    '<div class="totals" data-ui="totals"><span><b>'+all+'</b>cards in every game</span><span><b>'+gold+'</b>Gold Legend'+(gold===1?'':'s')+'</span><span><b>'+(levelInfo(S.xp).lvl)+'</b>'+esc(Binder.GAMES[GAME].title)+' level</span></div>';
 }
 // A locked slot shows the atomic number for an element, '#n' for anything else (any game).
 const slotNum=it=>it.__g?'#'+esc(it.n||String(it.id).replace(/\D/g,'')):it.cat==='el'?it.zn:'#'+it.id.replace(/\D/g,'');
@@ -1446,7 +1455,7 @@ function binderHTML(){
 }
 /* Binder top: unopened packs, then the odds in plain numbers (straight from PACK_ODDS, so they cannot drift). */
 // Why the pack was earned (never what is inside).
-const packWhy=p=>p.reason==='vs'?'Earned: VS win':p.reason==='day'?'Earned: daily practice':'Earned: '+((BY[p.cardId]||{}).name||p.cardName||'a card')+' reached Gold Legend';
+const packWhy=p=>p.reason==='vs'?'Earned: VS win':p.reason==='day'?'Earned: daily practice':p.reason==='level'?'Earned: reached Lv '+p.level+(p.game&&p.game!==GAME&&Binder.GAMES[p.game]?' in '+Binder.GAMES[p.game].title:''):'Earned: '+((BY[p.cardId]||{}).name||p.cardName||'a card')+' reached Gold Legend';
 // The pack itself (big and binder thumbnail) is generated art, img/pack.webp (design/pack-art.md) with a CSS sheen;
 // card backs keep the CSS foil design.
 const packArt=sz=>sz==='card'?'<span class="pkart card" aria-hidden="true"><span class="pkfoil"></span><span class="pklogo">'+atomLogo+'</span><span class="pkcrimp t"></span><span class="pkcrimp b"></span></span>'
@@ -1830,7 +1839,7 @@ addEventListener('resize',()=>{mclr();clearTimeout(rz);rz=setTimeout(()=>{
   RW=w;if(V.screen!=='home')render();if(V.modal)renderModal(true);
 },180)});
 /* Hooks for vs.js (VS Arena). Solo play does not depend on any of this. */
-window.Arcade={GAME,cardById,QNS,S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
+window.Arcade={GAME,gainXp,cardById,QNS,S,V,BY,ALL,TIERS,tierOf,nextTier,tierShown,cardHTML,esc,tone,save,render,levelInfo,DECKS,ROOMS,deckItems,roomPool,roomOf,buildRound,THEMES,
   acct:()=>ACCT,
   ICONS,ICON_IDS,iconOf,iconSVG,iconGridHTML,setIcon,getIcon:()=>S.icon,
   WIN_ICONS,GOLD_IDS,PACK_ODDS,FINISHES,GOLD_AT,earnPack,dayKey,dailyPack,dailyReminder,rollPack,packHave,applyPack,featuredGold,weekOf,openPack:id=>openPack(id),
@@ -1841,6 +1850,6 @@ render();
 
 <!-- Bump ?v= whenever binder.js, cloud.js or vs.js changes, so browsers do not mix a cached old file with new ones. -->
 <script type="module" src="cloud.js?v=7"></script>
-<script type="module" src="vs.js?v=13"></script>
+<script type="module" src="vs.js?v=14"></script>
 </body>
 </html>

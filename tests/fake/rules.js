@@ -47,7 +47,7 @@ const SEAT_KEYS = PLAYER_KEYS.concat(['icon']);     // icon is optional: hasOnly
 const PLAYER_REQUIRED = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'abandoned', 'left'];
 export const ANSWER_KEYS = ['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'];
 const PROFILE_KEYS = ['nick', 'cls', 'icon', 'xp', 'level', 'updated', 'unlocked', 'finishes', 'finishOn', 'packs', 'packLog', 'progress'];
-const GAME_DOC_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog', 'updated'];
+const GAME_DOC_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'xp', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog', 'updated'];
 
 // ---- tiny helpers (the Firestore-rules vocabulary) ----
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v) && !('__ts' in v);
@@ -279,6 +279,7 @@ const gamesWrite = playersOwn.concat([
   ['owned, miss, stars (if present) are maps', c => ['owned', 'miss', 'stars'].every(k => !(k in c.inc) || isObj(c.inc[k]))],
   ['vs (if present) is a map with keys w, l, streak, best, played', c => !('vs' in c.inc) || (isObj(c.inc.vs) && hasOnly(c.inc.vs, ['w', 'l', 'streak', 'best', 'played']))],
   ['vsAt (if present) is a number', c => !('vsAt' in c.inc) || typeof c.inc.vsAt === 'number'],
+  ['xp (if present) is a number >= 0', c => !('xp' in c.inc) || (typeof c.inc.xp === 'number' && c.inc.xp >= 0)],
   ['pack data (legacy keys) well formed', c => packDataOk(c.inc)]
 ]);
 

@@ -114,7 +114,8 @@ service cloud.firestore {
     // Anonymous guests never read or write here (guests have no stored progress).
     //   nick, cls        identity (from the sign-in), shown in VS seats and the class lobby
     //   icon             profile icon id (account-wide)
-    //   xp, level        account-wide experience; level is derived from xp (binder.js levelOf)
+    //   xp, level        LEGACY account-wide XP (before BINDER_VERSION 6). Frozen: carried along, credited to
+    //                    Elemental (binder.js legacyXp). XP is per game now, on the game doc.
     //   unlocked, finishes, finishOn, packs, packLog   everything packs touch (account-wide)
     //   progress         A pre-Binder Elemental save, FROZEN (the transition is retired): it may stay on a doc that
     //                    already has it, unchanged, so nothing is deleted, but it can never be created or edited.
@@ -135,13 +136,13 @@ service cloud.firestore {
 
       // -------------------------------------------------------------------------------------------
       // /players/{uid}/games/{gameId}: one game's progress (cards owned and missed, room stars, rounds, best streak,
-      // VS record). The pack keys are accepted for migrated Elemental saves; binder.js moves them to the profile.
+      // VS record, XP). The pack keys are accepted for migrated Elemental saves; binder.js moves them to the profile.
       // -------------------------------------------------------------------------------------------
       match /games/{gameId} {
         allow read: if isAccount() && request.auth.uid == uid;
         allow create, update: if isAccount() && request.auth.uid == uid
           && gameId in gameIds()
-          && request.resource.data.keys().hasOnly(['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt',
+          && request.resource.data.keys().hasOnly(['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'xp',
                'packs', 'finishes', 'finishOn', 'unlocked', 'packLog', 'updated'])
           && (!('owned' in request.resource.data) || request.resource.data.owned is map)
           && (!('miss' in request.resource.data) || request.resource.data.miss is map)
@@ -149,6 +150,7 @@ service cloud.firestore {
           && (!('vs' in request.resource.data)
               || (request.resource.data.vs is map && request.resource.data.vs.keys().hasOnly(['w', 'l', 'streak', 'best', 'played'])))
           && (!('vsAt' in request.resource.data) || request.resource.data.vsAt is number)
+          && (!('xp' in request.resource.data) || (request.resource.data.xp is number && request.resource.data.xp >= 0))
           && packDataOk(request.resource.data);
         allow delete: if false;
       }

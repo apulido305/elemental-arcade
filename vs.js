@@ -1224,7 +1224,7 @@ function award() {
   if (finished && answered) {
     rw.bonus = place === 1 ? 40 : place === 2 ? 25 : place === 3 ? 15 : place <= 10 ? 8 : 5;
     rw.xp = rw.bonus + 10 * (me.correct || R.my.correct || 0);
-    S.xp += rw.xp;
+    rw.lvPacks = Arc.gainXp(rw.xp);   // pays a pack for each level reached
   }
   rw.lvAfter = Arc.levelInfo(S.xp).lvl;
   if (!R.guest && C.account() && finished) {
@@ -1265,7 +1265,7 @@ function resultHTML() {
     rewards = '<p class="vs-sub">You placed <b style="color:var(--gold)">' + ordinal(rw.place) + '</b> of ' + rw.total + '.' + (rw.bonus ? ' Placement bonus +' + rw.bonus + ' XP.' : '') + ' Cards earned: ' + rw.cards + '.</p>' +
       (rw.pack ? '<p data-vs="pack-earned"><span class="vs-pill">PACK EARNED: open it from your binder</span></p>' : '') +
       (rw.daily ? '<p data-vs="daily-earned"><span class="vs-pill">DAILY PACK EARNED: open it from your binder</span></p>' : '') +
-      (rw.lvAfter > rw.lvBefore ? '<p><span class="vs-pill">LEVEL UP: Lv ' + rw.lvAfter + ' ' + esc(Arc.levelInfo(S.xp).title) + '</span></p>' : '') +
+      (rw.lvAfter > rw.lvBefore ? '<p><span class="vs-pill">LEVEL UP: Lv ' + rw.lvAfter + ' ' + esc(Arc.levelInfo(S.xp).title) + (rw.lvPacks ? ' &middot; ' + (rw.lvPacks === 1 ? 'PACK' : rw.lvPacks + ' PACKS') + ' EARNED' : '') + '</span></p>' : '') +
       (rw.record ? '<p class="vs-sub" data-vs="vs-result-record">VS record: ' + rw.record.w + '-' + rw.record.l + (rw.record.streak ? ' &middot; streak ' + rw.record.streak : '') + '</p>' : '');
   } else rewards = '<p class="vs-sub">' + (meP.abandoned || R.kicked ? 'You were disconnected before the end, so there is no placement bonus.' : abandoned ? 'Everyone left before the end.' : 'No placement bonus this time.') + '</p>';
   // The server total is the score that counts. If this phone tallied more, some answers never landed: say so.
