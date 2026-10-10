@@ -378,13 +378,9 @@ function watchLobby() {
   sweep();   // background cleanup of this class's dead arenas (throttled; never blocks the menu)
   const F = fb.F, db = fb.db;
   try {
-    // TRANSITION: no game filter in the query, because arenas hosted from a cached pre-Binder page have no 'game' field
-    // and an equality filter on 'game' would hide them. The query pins the class (the rules require that), and the
-    // filter below keeps this game's arenas and the old game-less ones. When every student has the new page (a few
-    // weeks), put F.where('game', '==', Arc.GAME) back and drop the limit to 20.
-    const q = F.query(F.collection(db, 'matches'), F.where('listed', '==', true), F.where('status', '==', 'lobby'), F.where('cls', '==', acct.cls), F.limit(40));
+    const q = F.query(F.collection(db, 'matches'), F.where('listed', '==', true), F.where('status', '==', 'lobby'), F.where('cls', '==', acct.cls), F.where('game', '==', Arc.GAME), F.limit(20));
     const apply = snap => {
-      // Another game's arena never belongs here (its decks and rooms are not ours). A match without 'game' is ours.
+      // Another game's arena never belongs here (its decks and rooms are not ours), even if a stale query returns one.
       const out = []; snap.forEach(d => { const m = d.data(); if ((m.game || 'chem') === Arc.GAME) out.push(Object.assign({ code: d.id }, m)); });
       out.forEach(d => { if (d.status === 'lobby' && toMs(d.expireAt) && toMs(d.expireAt) < Date.now()) F.updateDoc(F.doc(db, 'matches', d.code), { status: 'expired' }).catch(() => {}); });
       ui.lobby = out; renderLobbyList();

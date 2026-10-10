@@ -39,10 +39,11 @@ test.describe('rules: guests (anonymous)', () => {
     await expectDenied(F.getDoc(g.ref('players', g.uid)), 'not anonymous');
     await expectDenied(F.setDoc(g.ref('players', g.uid), { progress: {}, nick: 'x', cls: 'y', updated: F.serverTimestamp() }), 'not anonymous');
     await expectDenied(F.setDoc(g.ref('players', kid.uid), { progress: {}, nick: 'x', cls: 'y', updated: F.serverTimestamp() }));
-    // signed-in student: own doc only, whitelisted keys only (vs and vsAt allowed)
+    // signed-in student: own docs only, whitelisted keys only (the VS record lives in games/chem); 'progress' is frozen
     await expectDenied(kid.F.getDoc(kid.ref('players', g.uid)));
-    await kid.F.updateDoc(kid.ref('players', kid.uid), { 'progress.vs': { w: 1, l: 0, streak: 1, best: 1, played: 1 }, 'progress.vsAt': 123 });
-    await expectDenied(kid.F.updateDoc(kid.ref('players', kid.uid), { 'progress.cheat': 1 }), 'whitelisted');
+    await kid.F.setDoc(kid.ref('players', kid.uid, 'games', 'chem'), { vs: { w: 1, l: 0, streak: 1, best: 1, played: 1 }, vsAt: 123 });
+    await expectDenied(kid.F.updateDoc(kid.ref('players', kid.uid, 'games', 'chem'), { cheat: 1 }), 'whitelisted');
+    await expectDenied(kid.F.updateDoc(kid.ref('players', kid.uid), { 'progress.vs': { w: 1 } }), 'frozen');
     await expectDenied(kid.F.updateDoc(kid.ref('players', kid.uid), { admin: true }), 'hasOnly');
   });
 
@@ -401,7 +402,7 @@ test.describe('rules: profile icons', () => {
     await expectDenied(F.updateDoc(me, { icon: 'unicorn' }), 'icon (if present)');
     await expectDenied(F.updateDoc(me, { icon: '<svg onload=alert(1)>' }), 'icon (if present)');
     await expectDenied(F.updateDoc(me, { icon: 7 }), 'icon (if present)');
-    await expectDenied(F.updateDoc(me, { 'progress.icon': 'flask' }), 'whitelisted');   // only top-level
+    await expectDenied(F.updateDoc(me, { 'progress.icon': 'flask' }), 'frozen');   // only top-level (and 'progress' is frozen)
     const g = await guest(arena);
     await expectDenied(g.F.setDoc(g.ref('players', g.uid), { progress: {}, nick: 'x', cls: 'y', icon: 'atom', updated: g.F.serverTimestamp() }), 'not anonymous');
     await expectDenied(g.F.updateDoc(g.ref('players', kid.uid), { icon: 'atom' }));

@@ -2,7 +2,7 @@
 // one account and one Binder for every arcade game:
 // - accounts: Elemental's original accounts still sign in; accounts made in Cell Arcade sign in here; sign-up finds an
 //   existing account instead of making a second one;
-// - saving: games/chem plus the profile, the pre-Binder 'progress' map mirrored (never dropped), games/bio untouched;
+// - saving: games/chem plus the profile, the pre-Binder 'progress' map frozen (kept, never edited), games/bio untouched;
 // - cross-game: Cell Arcade icons and packs work here; VS arenas stay in their own game; cards.json; guest migration.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -110,7 +110,7 @@ test.describe('accounts', () => {
 });
 
 test.describe('saving through the Binder', () => {
-  test('after a round: cards in games/chem, XP and unlocks on the profile, the old progress map mirrored and kept; games/bio never changes', async ({ arena }) => {
+  test('after a round: cards in games/chem, XP and unlocks on the profile, the old progress map kept unchanged; games/bio never changes', async ({ arena }) => {
     const { client, uid } = await legacyAccount(arena, 'class1', 'eve', '1234', { owned: { el1: 2 }, xp: 100, unlocked: ['cat'], packLog: ['vs:ABCDEF'] }, 'cat');
     // the same student played Cell Arcade too (its doc and a Cell Arcade unlock)
     await client.signIn('class1', 'eve').catch(() => {});                                 // Binder scheme: no such account
@@ -135,34 +135,36 @@ test.describe('saving through the Binder', () => {
     expect(prof.level).toBe(B.levelOf(prof.xp));
     expect(prof.unlocked).toEqual(expect.arrayContaining(['cat', 'bio:frog']));
     expect(prof.icon).toBe('cat');
-    // the pre-Binder map stays (old cached pages may still save into it), with the account half mirrored in
+    // the pre-Binder map stays, frozen: never mirrored into, never dropped
     expect(prof.progress.owned).toEqual({ el1: 2 });
-    expect(prof.progress.xp).toBe(prof.xp);
-    expect(prof.progress.unlocked).toEqual(expect.arrayContaining(['cat', 'bio:frog']));
+    expect(prof.progress.xp).toBe(100);
+    expect(prof.progress.unlocked).toEqual(['cat']);
     expect(arena.backend.adminGet(`players/${uid}/games/bio`)).toEqual(bioBefore);        // saving chem never touches bio
     expect(arena.backend.denials).toEqual([]);
     expect(dev.errors).toEqual([]);
   });
 
-  test('a pre-Binder Elemental save landing in between (it rewrites the whole doc) loses nothing', async ({ arena }) => {
+  test('the old progress map is frozen: a cached pre-Binder page can no longer edit it, and nothing is lost', async ({ arena }) => {
     const { client, uid } = await legacyAccount(arena, 'class1', 'fay', '1234', { owned: { el1: 1 }, xp: 10, unlocked: ['cat'] }, 'cat');
+    const before = arena.backend.adminGet('players/' + uid).progress;
     const dev = await arena.device({ width: PHONE }), p = dev.page;
     await dev.goto('/');
     await signInWithClass(dev, 'class1', 'fay', '1234');
     await p.evaluate(() => { Arcade.S.unlocked.push('dog'); Arcade.S.xp += 50; Arcade.save(); });
     await p.evaluate(() => Binder.flush());
     await expect.poll(() => arena.backend.adminGet('players/' + uid).unlocked, { timeout: 8000 }).toContain('dog');
-    // an old cached copy of Elemental saves: read, merge 'progress' (max / union), rewrite the WHOLE doc
+    expect(arena.backend.adminGet('players/' + uid).progress).toEqual(before);           // carried along unchanged
+    // an old cached copy of Elemental tries to save: read, edit 'progress', rewrite the WHOLE doc. The rules refuse it.
     await client.A.signInWithEmailAndPassword(client.auth, B.LEGACY_SCHEMES[0].email('class1', 'fay'), B.LEGACY_SCHEMES[0].pass('1234', 'class1'));
     const ref = client.ref('players', uid), d = (await client.F.getDoc(ref)).data();
-    await client.F.setDoc(ref, { progress: Object.assign({}, d.progress, { owned: { el1: 1, el2: 1 }, xp: d.progress.xp + 5 }), nick: d.nick, cls: d.cls, icon: 'atom', updated: client.F.serverTimestamp() });
-    expect(arena.backend.adminGet('players/' + uid).unlocked).toBeUndefined();            // gone from the top level...
+    const code = await client.F.setDoc(ref, { progress: Object.assign({}, d.progress, { owned: { el1: 1, el2: 1 } }), nick: d.nick, cls: d.cls, icon: 'atom', updated: client.F.serverTimestamp() }).then(() => null, e => e.code);
+    expect(code).toBe('permission-denied');
+    expect(arena.backend.adminGet('players/' + uid).unlocked).toEqual(expect.arrayContaining(['cat', 'dog']));   // nothing erased
     await p.reload(); await dev.cloudReady();
     const s = await S(p, 'xp', 'unlocked', 'owned');
-    expect(s.unlocked).toEqual(expect.arrayContaining(['cat', 'dog']));                  // ...but mirrored in progress, so nothing is lost
-    expect(s.xp).toBe(65);
-    expect(s.owned.el2).toBe(1);
-    expect(arena.backend.denials).toEqual([]);
+    expect(s.unlocked).toEqual(expect.arrayContaining(['cat', 'dog']));
+    expect(s.xp).toBe(60);
+    expect(s.owned.el1).toBe(1);
     expect(dev.errors).toEqual([]);
   });
 });
@@ -237,7 +239,7 @@ test.describe('VS Arena across games', () => {
     // a Cell Arcade arena in the same class
     const bioHost = arena.client('biohost'); await bioHost.signUp('class1', 'bioboss');
     const bioCode = await bioHost.createMatch({ game: 'bio', deck: 's20', room: 'function' });
-    // an arena hosted from a cached pre-Binder page: no 'game' field at all
+    // an arena hosted from a cached pre-Binder page: no 'game' field (the transition is retired: the lobby filters on game)
     const oldHost = arena.client('oldhost'); await oldHost.signUp('class1', 'oldpage');
     const oldDoc = oldHost.matchDoc({ deck: 's20', room: 'mixed' }); delete oldDoc.game;
     const ob = oldHost.F.writeBatch(oldHost.db);
@@ -246,7 +248,7 @@ test.describe('VS Arena across games', () => {
     await kid.signUp('class1', 'kiddo');
     await openVs(kid);
     await expect(kid.page.locator(`[data-vs="lobby-join"][data-code="${code}"]`)).toBeVisible();
-    await expect(kid.page.locator('[data-vs="lobby-join"][data-code="ZZQQ22"]')).toBeVisible();   // old page's arena still listed
+    await expect(kid.page.locator('[data-vs="lobby-join"][data-code="ZZQQ22"]')).toHaveCount(0);   // a game-less (pre-Binder page) arena is no longer listed
     await expect(kid.page.locator(`[data-vs="lobby-join"][data-code="${bioCode}"]`)).toHaveCount(0);
     expect(arena.backend.denials.filter(d => d.op === 'list')).toEqual([]);                  // the class-pinned list query is allowed
     // join by code: refused with the other game's name, and no seat written (signed in, then as a guest)

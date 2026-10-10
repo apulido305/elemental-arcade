@@ -15,7 +15,7 @@
    It does not import Firebase: cloud.js loads the SDK and hands it over with Binder.init({F, db}). */
 (function (root) {
   'use strict';
-  const BINDER_VERSION = 4;
+  const BINDER_VERSION = 5;
 
   // ---------- registry ----------
   // id: short game id, also the card-id prefix ('bio:org3') and the icon-id prefix ('bio:frog').
@@ -181,21 +181,9 @@
     if (isObj(profile && profile.progress)) out.chem = mergeGame(pick(out.chem || {}, GAME_KEYS), pick(profile.progress, GAME_KEYS));
     return out;
   }
-  /* TRANSITION (until every game saves through the Binder): pre-Binder Elemental writes its whole player doc as
-     {progress, nick, cls, icon, updated}, which erases the profile's top-level keys. So while a doc has 'progress':
-     - the account half is mirrored into progress (xp, unlocked, finishes, finishOn, packLog), which Elemental merges
-       and keeps (max for xp, unions for the rest), so Elemental also sees XP and the daily-pack claim;
-     - unopened packs are copied into the saving game's own doc (Elemental never touches it), because Elemental's pack
-       screen cannot open another game's packs;
-     - the 'progress' map itself is never dropped.
-     loadBinder folds all of it back together. design/binder-spec.md, "Sharing elemental-arc". */
-  function mirrorLegacy(progress, acc) {
-    return Object.assign({}, progress, {
-      xp: Math.max(+progress.xp || 0, acc.xp || 0), unlocked: uni(progress.unlocked, acc.unlocked).filter(id => UNLOCKABLE.includes(id)),
-      finishes: mergeFin(progress.finishes, acc.finishes), finishOn: Object.assign({}, isObj(progress.finishOn) ? progress.finishOn : {}, acc.finishOn || {}),
-      packLog: uni(progress.packLog, acc.packLog)
-    });
-  }
+  /* A pre-Binder Elemental doc's 'progress' map is FROZEN (the transition is retired, BINDER_VERSION 5): it is never
+     written or mirrored any more, only read (foldLegacy, legacyGames) and carried along unchanged when the profile is
+     saved, because the rules let it stay but never change. Nothing deletes it. */
 
   // ---------- guests (localStorage, no account) ----------
   const GUEST_KEY = 'arcade-v1';
@@ -274,18 +262,16 @@
           const ps = await tx.get(pref(uid));
           const prof = ps.exists() ? ps.data() : {};
           let acc = foldLegacy(prof, cache.games), icon = prof.icon || null;
-          const legacy = isObj(prof.progress);
           const sps = jobs.map(([g, job]) => [g, job, splitProgress(job.progress)]);
           sps.forEach(([g, job, sp]) => { acc = mergeAccount(acc, sp.account); icon = mergeIcon(prof, job.meta, acc.unlocked, icon); });
           for (const [g, , sp] of sps) {
             const game = mergeGame(pick(cache.games[g] || {}, GAME_KEYS), sp.game);
-            if (legacy) game.packs = acc.packs;   // transition: unopened packs also live where pre-Binder Elemental cannot erase them
             tx.set(gref(uid, g), Object.assign({}, game, { updated: F.serverTimestamp() }));
             wrote[g] = game;
           }
           out = Object.assign({ nick: prof.nick || (who && who.nick), cls: prof.cls || (who && who.cls) }, acc, { level: levelOf(acc.xp), updated: F.serverTimestamp() });
           if (icon) out.icon = icon;
-          if (legacy) out.progress = mirrorLegacy(prof.progress, acc);
+          if (isObj(prof.progress)) out.progress = prof.progress;   // frozen: carried along unchanged, never edited or dropped
           tx.set(pref(uid), out);
         });
         cache.profile = Object.assign({}, out, { updated: Date.now() });
@@ -363,7 +349,7 @@
   const api = {
     BINDER_VERSION, GAMES, registerGame, current,
     ICON_SETS, BANDS, FREE_ICONS, PACK_ICONS, GOLD_ICONS, UNLOCKABLE, ICON_META, isGold, baseOf, iconKnown, iconGame, iconName, iconLabel, iconBand, iconSrc, iconOwned,
-    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames, mirrorLegacy,
+    norm, EMAIL_DOMAIN, accountEmail, accountPass, whoFromEmail, LEGACY_SCHEMES, accountCandidates, legacyGames,
     ACCOUNT_KEYS, GAME_KEYS, GAME_LEGACY_KEYS, PROFILE_KEYS, VS0, emptyGame, emptyAccount, levelOf, splitProgress, joinProgress,
     mergeGame, mergeAccount, mergeVs, mergeIcon, foldLegacy, toMs,
     GUEST_KEY, guestAll, guestLoad, guestSave, guestClear, guestCount, _setStorage: s => { STORE = s; },

@@ -18,7 +18,7 @@ Elemental Arcade and its biology sibling [Cell Arcade](https://apulido305.github
 - **Shared files.** `binder.js` and `firestore.rules` must stay byte for byte the same in both repos. Change them in both, bump `BINDER_VERSION` (and `?v=` on the script tag), run `node tools/sync-rules.mjs` in Cell Arcade, and republish the rules.
 - **Card ids never change** (`el1`, `cat3`, `iso12`, no game prefix), and neither do icon ids (`atom`, `cat`, `cat-gold`). Other games' ids carry their prefix (`bio:org3`, `bio:frog`).
 
-**Transition (pre-Binder saves).** Before the Binder, Elemental saved one doc, `/players/{uid}` = `{progress, nick, cls, icon, updated}`. The Binder reads that `progress` map as Elemental's cards plus the account half, and while a doc has one, every save mirrors XP, unlocks, finishes and the daily-pack claim back into it. An old copy of the page still open on some phone therefore keeps working and loses nothing. Never delete `progress` by hand. Once every student has the new page, a later `BINDER_VERSION` can retire the mirror and the matching transition rules.
+**Pre-Binder saves.** Before the Binder, Elemental saved one doc, `/players/{uid}` = `{progress, nick, cls, icon, updated}`. The Binder still reads that `progress` map as Elemental's cards plus the account half, so nobody loses anything. Since `BINDER_VERSION 5` the map is **frozen**: it stays on the doc unchanged, but the rules refuse any edit, so a very old copy of the page that is somehow still open can no longer save (it shows "offline" until refreshed). Never delete `progress` by hand; nothing needs to be migrated.
 
 
 ## Turn on sign-in and saved binders (Firebase, free tier)
@@ -72,7 +72,6 @@ One signed-in student hosts, picks a deck and room, and puts a 6-character code 
 
 - The shared clock is the match's `startAt` server timestamp. Nothing advances the game on a server; every tab runs the same schedule. School devices are assumed to be NTP-synced within a second or two.
 - A code works for any class. The class lobby only lists open arenas from the signed-in student's own class. Guests never see the lobby.
-- For now the lobby also lists arenas hosted from an old cached copy of the page (they have no `game` field). Once every student has the new page (a few weeks), the `vs.js` lobby query can filter on `game` again: see the TRANSITION comment in `watchLobby`.
 - Rewards: each correct answer adds card XP (once per card per match), plus a placement bonus (1st +40, 2nd +25, 3rd +15, 4th to 10th +8, others who finished +5). Signed-in students keep a VS record (`VS 4-1 · streak 2`) on the home and account screens. Guests keep card XP in this browser only and have no record.
 - Disconnects: a student who goes quiet is marked away and stays on the ladder. If only one player is left, they win by forfeit. A student whose page reloads or drops mid-match can type the same code to rejoin their seat with their points, unless they were silent for more than 20 seconds and got marked away. New players still cannot join once the countdown starts. A lobby that never starts expires after 5 minutes.
 - `window.VS_TIME_SCALE` is a test-only number that multiplies every VS duration.

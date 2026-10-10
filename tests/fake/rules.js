@@ -47,7 +47,6 @@ const SEAT_KEYS = PLAYER_KEYS.concat(['icon']);     // icon is optional: hasOnly
 const PLAYER_REQUIRED = ['nick', 'guest', 'joinedAt', 'lastSeen', 'score', 'correct', 'totalMs', 'answeredQ', 'abandoned', 'left'];
 export const ANSWER_KEYS = ['q', 'choice', 'elapsedMs', 'correct', 'points', 'at'];
 const PROFILE_KEYS = ['nick', 'cls', 'icon', 'xp', 'level', 'updated', 'unlocked', 'finishes', 'finishOn', 'packs', 'packLog', 'progress'];
-const LEGACY_PROGRESS_KEYS = ['owned', 'miss', 'stars', 'xp', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog'];
 const GAME_DOC_KEYS = ['owned', 'miss', 'stars', 'rounds', 'best', 'vs', 'vsAt', 'packs', 'finishes', 'finishOn', 'unlocked', 'packLog', 'updated'];
 
 // ---- tiny helpers (the Firestore-rules vocabulary) ----
@@ -271,10 +270,8 @@ const playersWrite = playersOwn.concat([
   ['icon (if present): free, or unlocked in this doc', c => iconOk(c.inc)],
   ['xp (if present) is a number >= 0; level an int >= 1', c => (!('xp' in c.inc) || (typeof c.inc.xp === 'number' && c.inc.xp >= 0)) && (!('level' in c.inc) || (isInt(c.inc.level) && c.inc.level >= 1))],
   ['pack data: unlocked are pack icon ids, packs <= 200, packLog a list, finishes a map, finishOn values finish ids', c => packDataOk(c.inc)],
-  ['progress (pre-Binder Elemental save, if present): whitelisted keys, pack data, vs shape', c => !('progress' in c.inc) || (isObj(c.inc.progress)
-    && hasOnly(c.inc.progress, LEGACY_PROGRESS_KEYS) && packDataOk(c.inc.progress)
-    && (!('vs' in c.inc.progress) || (isObj(c.inc.progress.vs) && hasOnly(c.inc.progress.vs, ['w', 'l', 'streak', 'best', 'played'])))
-    && (!('vsAt' in c.inc.progress) || typeof c.inc.progress.vsAt === 'number'))]
+  ['progress (a pre-Binder Elemental save) is frozen: only kept unchanged on a doc that already has it', c => !('progress' in c.inc)
+    || (!!c.res && 'progress' in c.res && same(c.inc.progress, c.res.progress))]
 ]);
 const gamesWrite = playersOwn.concat([
   ['gameId is a known game', c => GAME_IDS.includes(c.params.gameId)],
