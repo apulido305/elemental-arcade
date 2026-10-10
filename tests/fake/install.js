@@ -51,7 +51,7 @@ const exportsOf = (ns, names) => `import { sdk } from './fake-browser.js';\n` +
 export const SURFACE = {
   app: ['initializeApp'],
   auth: ['getAuth', 'onAuthStateChanged', 'setPersistence', 'browserLocalPersistence', 'browserSessionPersistence',
-    'createUserWithEmailAndPassword', 'signInWithEmailAndPassword', 'signInAnonymously', 'signOut'],
+    'createUserWithEmailAndPassword', 'signInWithEmailAndPassword', 'signInAnonymously', 'signOut', 'deleteUser'],
   firestore: ['getFirestore', 'doc', 'collection', 'getDoc', 'getDocs', 'setDoc', 'updateDoc', 'deleteDoc', 'onSnapshot', 'query',
     'where', 'limit', 'runTransaction', 'writeBatch', 'serverTimestamp', 'increment', 'Timestamp']
 };

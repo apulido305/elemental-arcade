@@ -237,10 +237,18 @@ test.describe('VS Arena across games', () => {
     // a Cell Arcade arena in the same class
     const bioHost = arena.client('biohost'); await bioHost.signUp('class1', 'bioboss');
     const bioCode = await bioHost.createMatch({ game: 'bio', deck: 's20', room: 'function' });
+    // an arena hosted from a cached pre-Binder page: no 'game' field at all
+    const oldHost = arena.client('oldhost'); await oldHost.signUp('class1', 'oldpage');
+    const oldDoc = oldHost.matchDoc({ deck: 's20', room: 'mixed' }); delete oldDoc.game;
+    const ob = oldHost.F.writeBatch(oldHost.db);
+    ob.set(oldHost.ref('matches', 'ZZQQ22'), oldDoc); ob.set(oldHost.ref('matches', 'ZZQQ22', 'players', oldHost.uid), oldHost.playerDoc());
+    await ob.commit();
     await kid.signUp('class1', 'kiddo');
     await openVs(kid);
     await expect(kid.page.locator(`[data-vs="lobby-join"][data-code="${code}"]`)).toBeVisible();
+    await expect(kid.page.locator('[data-vs="lobby-join"][data-code="ZZQQ22"]')).toBeVisible();   // old page's arena still listed
     await expect(kid.page.locator(`[data-vs="lobby-join"][data-code="${bioCode}"]`)).toHaveCount(0);
+    expect(arena.backend.denials.filter(d => d.op === 'list')).toEqual([]);                  // the class-pinned list query is allowed
     // join by code: refused with the other game's name, and no seat written (signed in, then as a guest)
     const msg = 'That code is for an arena in Cell Arcade. Open Cell Arcade to join it.';
     await joinByCode(kid, bioCode, { open: false });
@@ -302,5 +310,54 @@ test.describe('cards.json and guests', () => {
     expect(left.games.chem).toBeUndefined();
     expect(left.games.bio).toEqual({ owned: { 'bio:org1': 2 } });
     expect(dev.errors).toEqual([]);
+  });
+});
+
+test.describe('sign-up never makes a duplicate; guest saves merge across games', () => {
+  test('a pre-Binder account with another PIN keeps its nickname: sign-up is refused, nothing is created or left behind', async ({ arena }) => {
+    const { uid } = await legacyAccount(arena, 'class1', 'gus', '1111', { owned: { el1: 3 }, xp: 20 });
+    const users0 = arena.backend.users.size;
+    const dev = await arena.device({ width: PHONE }), p = dev.page;
+    await dev.goto('/');
+    await p.click('[data-act="account"]');
+    await p.click('[data-act="authtab"][data-id="up"]');
+    await p.fill('#f-cls', 'class1'); await p.fill('#f-nick', 'gus'); await p.fill('#f-pin', '2222');   // a different PIN
+    await p.click('#authform button[type="submit"]');
+    await expect(p.locator('#authform .err')).toHaveText('That nickname is taken. Pick another, or use Sign in if it is yours.');
+    expect(await dev.currentUser()).toBeNull();
+    expect(arena.backend.users.size).toBe(users0);
+    expect(arena.backend.byEmail.has(B.accountEmail('class1', 'gus'))).toBe(false);
+    expect(arena.backend.adminGet('players/' + uid).progress.owned).toEqual({ el1: 3 });
+    // with the right PIN, sign-up signs in to the old account instead
+    await p.fill('#f-pin', '1111');
+    await p.click('#authform button[type="submit"]');
+    await expect(p.locator('[data-act="account"]')).toContainText('gus');
+    expect((await dev.currentUser()).uid).toBe(uid);
+    expect(dev.errors).toEqual([]);
+  });
+
+  test('a free nickname: the legacy probe is deleted, the account uses the shared scheme and claims its name', async ({ arena }) => {
+    const dev = await arena.device({ width: PHONE });
+    await dev.goto('/');
+    const users0 = arena.backend.users.size;
+    await dev.signUpViaUI('class2', 'hal', '4444');
+    const u = await dev.currentUser();
+    expect(u.email).toBe(B.accountEmail('class2', 'hal'));
+    expect(arena.backend.users.size).toBe(users0 + 1);
+    expect(arena.backend.byEmail.has(B.LEGACY_SCHEMES[0].email('class2', 'hal'))).toBe(false);
+    await expect.poll(() => arena.backend.adminGet('names/hal')).toEqual({ cls: 'class2', uid: u.uid });
+    expect(dev.errors).toEqual([]);
+  });
+
+  test('guests: Cell Arcade open in another tab never undoes XP, unlocks or packs saved here (guestSave merges)', async ({ arena }) => {
+    const dev = await arena.device({ width: PHONE, firebase: 'blocked' }), p = dev.page;
+    await dev.goto('/');
+    await p.evaluate(() => { Arcade.S.xp = 70; Arcade.S.unlocked = ['cat']; Arcade.save(); });
+    await p.evaluate(() => Binder.guestSave('bio', { owned: { 'bio:org1': 1 }, xp: 30, unlocked: ['bio:frog'], packLog: ['day:2026-10-10'] }, null));   // a stale tab
+    const g = await p.evaluate(() => Binder.guestAll());
+    expect(g.profile.xp).toBe(70);
+    expect(g.profile.unlocked.sort()).toEqual(['bio:frog', 'cat']);
+    expect(g.profile.packLog).toEqual(['day:2026-10-10']);
+    expect(g.games.bio.owned).toEqual({ 'bio:org1': 1 });
   });
 });

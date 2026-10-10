@@ -37,13 +37,13 @@ Until you do this, the game works as a guest and saves only in each browser.
 
 Students make an account with a class code, a nickname and a 4 to 6 digit PIN. The game turns those into a private made-up email and password for Firebase (`{class}_{nick}@players.arcade.example`, the same in every arcade game), so no real email or name is stored. Each student can read and write only their own save.
 
-Accounts made before the Binder keep Elemental's original made-up email (`…@players.elemental-arcade.example`). Sign-in tries the shared scheme first, then the original one, so nobody has to do anything. On New account, the game first tries the original scheme with the class code, nickname and PIN given: if that account exists, the student is signed in to it (and told so) instead of getting a second account.
+Accounts made before the Binder keep Elemental's original made-up email (`…@players.elemental-arcade.example`). Sign-in tries the shared scheme first, then the original one, so nobody has to do anything. On New account, the game first tries the original scheme with the class code, nickname and PIN given: if that account exists, the student is signed in to it (and told so) instead of getting a second account. If that account exists with a **different** PIN, the nickname is taken and sign-up is refused ("That nickname is taken. Pick another, or use Sign in if it is yours."), so nobody ends up with two accounts.
 
 Signing in needs only the nickname and PIN. At sign-up the game stores `/names/{nickname}` with the class code, and sign-in looks it up. Nicknames are therefore unique across all classes for new accounts.
 
 - Anyone can invent a class code. It is shown on the account screen.
 - Accounts made before the lookup existed are asked for their class code once. After that sign-in, the nickname is claimed and the class code is not needed again. (A student already signed in on a device claims it on their next visit.)
-- Accounts made in Cell Arcade are asked for their class code the first time they sign in here, which claims the nickname.
+- Cell Arcade uses the same lookup and claims the nickname at sign-up too, so its accounts sign in here with nickname and PIN. An older Cell Arcade account without a claim is asked for its class code once.
 - The `/names` rule accepts both account schemes; it is part of the shared `firestore.rules`.
 - There is no PIN reset. To let a student start over, delete their user under Authentication > Users and their document under Firestore > players.
 - Tell students to use a nickname, not their real name.
@@ -72,6 +72,7 @@ One signed-in student hosts, picks a deck and room, and puts a 6-character code 
 
 - The shared clock is the match's `startAt` server timestamp. Nothing advances the game on a server; every tab runs the same schedule. School devices are assumed to be NTP-synced within a second or two.
 - A code works for any class. The class lobby only lists open arenas from the signed-in student's own class. Guests never see the lobby.
+- For now the lobby also lists arenas hosted from an old cached copy of the page (they have no `game` field). Once every student has the new page (a few weeks), the `vs.js` lobby query can filter on `game` again: see the TRANSITION comment in `watchLobby`.
 - Rewards: each correct answer adds card XP (once per card per match), plus a placement bonus (1st +40, 2nd +25, 3rd +15, 4th to 10th +8, others who finished +5). Signed-in students keep a VS record (`VS 4-1 · streak 2`) on the home and account screens. Guests keep card XP in this browser only and have no record.
 - Disconnects: a student who goes quiet is marked away and stays on the ladder. If only one player is left, they win by forfeit. A student whose page reloads or drops mid-match can type the same code to rejoin their seat with their points, unless they were silent for more than 20 seconds and got marked away. New players still cannot join once the countdown starts. A lobby that never starts expires after 5 minutes.
 - `window.VS_TIME_SCALE` is a test-only number that multiplies every VS duration.
